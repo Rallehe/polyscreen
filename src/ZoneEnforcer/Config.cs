@@ -30,6 +30,9 @@ public class Config
     public Dictionary<string, List<Zone>> Layouts { get; set; } = new();
     public List<AutoRule> AutoRules { get; set; } = new();
 
+    /// <summary>Focused clamped windows go always-on-top so they cover the taskbar.</summary>
+    public bool TopmostOnFocus { get; set; } = true;
+
     [JsonIgnore]
     public List<Zone> ActiveZones =>
         Layouts.TryGetValue(ActiveLayout, out var zones) ? zones : new List<Zone>();
