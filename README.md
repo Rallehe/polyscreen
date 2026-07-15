@@ -27,6 +27,7 @@ instance (see CLI below).
 | `Ctrl+Alt+0` | Release the focused window (restores border and position) |
 | `Ctrl+Alt+Z` | Flash the zone overlay (also: double-click the tray icon) |
 | `Ctrl+Alt+B` | Black out / restore the zone under the mouse cursor |
+| `Ctrl+Alt+Esc` | Panic reset: release all windows, restore all blackouts |
 
 ## CLI
 
@@ -41,6 +42,7 @@ ZoneEnforcer.exe layout thirds           # switch layout; bare "layout" lists th
 ZoneEnforcer.exe blackout left           # toggle a black panel over a zone ("blackout off" restores all)
 ZoneEnforcer.exe edit                    # open the visual layout editor ("edit close" cancels)
 ZoneEnforcer.exe zones                   # flash the overlay
+ZoneEnforcer.exe reset                   # release all windows and blackouts
 ZoneEnforcer.exe reload                  # re-read config.json
 ZoneEnforcer.exe quit
 ```

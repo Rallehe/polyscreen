@@ -31,6 +31,7 @@ public class TrayContext : ApplicationContext
     private const int HotkeyReleaseId = 10;
     private const int HotkeyZonesId = 11;
     private const int HotkeyBlackoutId = 12;
+    private const int HotkeyPanicId = 13;
 
     private readonly Engine _engine;
     private readonly MarshalForm _marshal;
@@ -68,6 +69,16 @@ public class TrayContext : ApplicationContext
         Native.RegisterHotKey(_marshal.Handle, HotkeyReleaseId, mods, '0');   // Ctrl+Alt+0: release
         Native.RegisterHotKey(_marshal.Handle, HotkeyZonesId, mods, 'Z');     // Ctrl+Alt+Z: show zones
         Native.RegisterHotKey(_marshal.Handle, HotkeyBlackoutId, mods, 'B');  // Ctrl+Alt+B: black out zone under cursor
+        if (!Native.RegisterHotKey(_marshal.Handle, HotkeyPanicId, mods, (uint)Keys.Escape)) // Ctrl+Alt+Esc: reset everything
+            Log.Write("failed to register Ctrl+Alt+Esc (in use by another app)");
+    }
+
+    /// <summary>Panic reset: release every window, restore every blacked-out zone, close the editor.</summary>
+    private void ResetAll()
+    {
+        CloseAllBlackouts();
+        _engine.ReleaseAll();
+        _editor?.Close();
     }
 
     private void OnHotkey(int id)
@@ -75,6 +86,13 @@ public class TrayContext : ApplicationContext
         if (id == HotkeyZonesId)
         {
             OverlayForm.Flash(_engine.Config.ActiveZones);
+            return;
+        }
+
+        if (id == HotkeyPanicId)
+        {
+            ResetAll();
+            Notify("Released all windows and blackouts");
             return;
         }
 
@@ -213,7 +231,7 @@ public class TrayContext : ApplicationContext
         }
         menu.Items.Add(assigned);
 
-        menu.Items.Add(new ToolStripMenuItem("Release all", null, (_, _) => _engine.ReleaseAll()));
+        menu.Items.Add(new ToolStripMenuItem("Release all  (Ctrl+Alt+Esc)", null, (_, _) => ResetAll()));
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Reload config", null, (_, _) =>
         {
@@ -321,6 +339,13 @@ public class TrayContext : ApplicationContext
             case "zones":
                 OverlayForm.Flash(_engine.Config.ActiveZones);
                 return string.Join(Environment.NewLine, _engine.Config.ActiveZones.Select(z => z.ToString()));
+            case "reset":
+            {
+                int n = _engine.Assignments.Count;
+                int b = _blackouts.Count;
+                ResetAll();
+                return $"reset: released {n} window(s), restored {b} blackout(s)";
+            }
             case "reload":
                 CloseAllBlackouts();
                 _engine.ReloadConfig();
@@ -342,10 +367,12 @@ public class TrayContext : ApplicationContext
           blackout <zone> | blackout off     toggle a black panel over a zone
           edit [close]                       open the visual layout editor
           zones                              flash the zone overlay
+          reset                              release all windows and blackouts
           reload                             reload config.json
           quit                               exit ZoneEnforcer
         Hotkeys: Ctrl+Alt+1..9 assign focused window, Ctrl+Alt+0 release,
-                 Ctrl+Alt+Z show zones, Ctrl+Alt+B black out zone under cursor.
+                 Ctrl+Alt+Z show zones, Ctrl+Alt+B black out zone under cursor,
+                 Ctrl+Alt+Esc release everything.
         """;
 
     protected override void ExitThreadCore()
@@ -355,7 +382,7 @@ public class TrayContext : ApplicationContext
         _editor?.Close();
         _pipe.Dispose();
         _engine.Dispose(); // releases all windows back to their original state
-        for (int i = 1; i <= HotkeyBlackoutId; i++) Native.UnregisterHotKey(_marshal.Handle, i);
+        for (int i = 1; i <= HotkeyPanicId; i++) Native.UnregisterHotKey(_marshal.Handle, i);
         base.ExitThreadCore();
     }
 }
