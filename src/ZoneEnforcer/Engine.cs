@@ -206,7 +206,11 @@ public class Engine : IDisposable
 
         if (force || moved || frameChanged)
         {
-            uint flags = Native.SWP_NOZORDER | Native.SWP_NOACTIVATE | Native.SWP_NOOWNERZORDER;
+            // SWP_NOSENDCHANGING skips WM_WINDOWPOSCHANGING, so the app cannot veto
+            // the move — fullscreen Chromium windows otherwise pin themselves to the
+            // monitor bounds and the clamp silently never lands.
+            uint flags = Native.SWP_NOZORDER | Native.SWP_NOACTIVATE | Native.SWP_NOOWNERZORDER |
+                         Native.SWP_NOSENDCHANGING;
             if (frameChanged || force) flags |= Native.SWP_FRAMECHANGED;
             Native.SetWindowPos(hwnd, IntPtr.Zero, z.X, z.Y, z.Width, z.Height, flags);
             a.LastEnforce = DateTime.UtcNow;
