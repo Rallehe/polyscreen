@@ -119,6 +119,17 @@ public static class Native
     [DllImport("user32.dll")]
     public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
+    // DWM decorations (Windows 11; harmlessly fails on Windows 10)
+    public const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+    public const int DWMWA_BORDER_COLOR = 34;
+    public const int DWMWCP_DEFAULT = 0;
+    public const int DWMWCP_DONOTROUND = 1;
+    public const uint DWMWA_COLOR_NONE = 0xFFFFFFFE;
+    public const uint DWMWA_COLOR_DEFAULT = 0xFFFFFFFF;
+
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
+
     public static string GetWindowTitle(IntPtr hwnd)
     {
         var sb = new StringBuilder(512);

@@ -125,6 +125,7 @@ public class Engine : IDisposable
         {
             Native.SetWindowLongPtr(hwnd, Native.GWL_STYLE, a.OrigStyle);
             Native.SetWindowLongPtr(hwnd, Native.GWL_EXSTYLE, a.OrigExStyle);
+            ApplyDwmDecoration(hwnd, clamped: false);
             Native.SetWindowPos(hwnd, IntPtr.Zero, a.OrigRect.Left, a.OrigRect.Top,
                 a.OrigRect.Width, a.OrigRect.Height,
                 Native.SWP_NOZORDER | Native.SWP_NOACTIVATE | Native.SWP_NOOWNERZORDER | Native.SWP_FRAMECHANGED);
@@ -222,6 +223,8 @@ public class Engine : IDisposable
         var z = a.Zone;
         bool moved = r.Left != z.X || r.Top != z.Y || r.Width != z.Width || r.Height != z.Height;
 
+        if (force || frameChanged) ApplyDwmDecoration(hwnd, clamped: true);
+
         if (force || moved || frameChanged)
         {
             // SWP_NOSENDCHANGING skips WM_WINDOWPOSCHANGING, so the app cannot veto
@@ -233,6 +236,18 @@ public class Engine : IDisposable
             Native.SetWindowPos(hwnd, IntPtr.Zero, z.X, z.Y, z.Width, z.Height, flags);
             a.LastEnforce = DateTime.UtcNow;
         }
+    }
+
+    /// <summary>
+    /// Clamped windows get no DWM outline and square corners, so zones tile seamlessly;
+    /// the compositor draws both outside the window styles, hence the separate API.
+    /// </summary>
+    private static void ApplyDwmDecoration(IntPtr hwnd, bool clamped)
+    {
+        int corner = clamped ? Native.DWMWCP_DONOTROUND : Native.DWMWCP_DEFAULT;
+        Native.DwmSetWindowAttribute(hwnd, Native.DWMWA_WINDOW_CORNER_PREFERENCE, ref corner, sizeof(int));
+        int border = unchecked((int)(clamped ? Native.DWMWA_COLOR_NONE : Native.DWMWA_COLOR_DEFAULT));
+        Native.DwmSetWindowAttribute(hwnd, Native.DWMWA_BORDER_COLOR, ref border, sizeof(int));
     }
 
     private static bool IsShellWindow(IntPtr hwnd)
