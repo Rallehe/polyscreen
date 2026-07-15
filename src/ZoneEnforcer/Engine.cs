@@ -39,8 +39,14 @@ public class Engine : IDisposable
             IntPtr.Zero, _hookProc, 0, 0, Native.WINEVENT_OUTOFCONTEXT);
 
         // Safety net for events missed while throttled, and for cleanup of dead windows.
+        // Also reconciles topmost state: foreground events are not reliably delivered
+        // (e.g. around no-activate windows appearing), so poll the true foreground too.
         _poll = new System.Windows.Forms.Timer { Interval = 250 };
-        _poll.Tick += (_, _) => EnforceAll();
+        _poll.Tick += (_, _) =>
+        {
+            EnforceAll();
+            UpdateTopmost(Native.GetForegroundWindow());
+        };
         _poll.Start();
     }
 
@@ -131,11 +137,28 @@ public class Engine : IDisposable
         foreach (var a in _assignments.Values)
         {
             bool onTop = Config.TopmostOnFocus && a.Hwnd == foreground;
-            if (onTop == a.IsTopmost) continue;
-            bool ok = Native.SetWindowPos(a.Hwnd, onTop ? Native.HWND_TOPMOST : Native.HWND_NOTOPMOST,
-                0, 0, 0, 0, Native.SWP_NOMOVE | Native.SWP_NOSIZE | Native.SWP_NOACTIVATE);
-            if (ok) a.IsTopmost = onTop;
-            Log.Write($"topmost {(onTop ? "set" : "cleared")} for {a.Hwnd} (fg={foreground}, ok={ok})");
+            if (onTop)
+            {
+                if (!a.IsTopmost)
+                {
+                    bool ok = Native.SetWindowPos(a.Hwnd, Native.HWND_TOPMOST, 0, 0, 0, 0,
+                        Native.SWP_NOMOVE | Native.SWP_NOSIZE | Native.SWP_NOACTIVATE);
+                    if (ok) a.IsTopmost = true;
+                    Log.Write($"topmost set for {a.Hwnd} (fg={foreground}, ok={ok})");
+                }
+                // Topmost windows share one z-band with the taskbar and blackout panels,
+                // and any of those being raised (e.g. a tray click) reorders the band —
+                // so re-raise to the top of the band on every focus, not just the first.
+                Native.SetWindowPos(a.Hwnd, Native.HWND_TOP, 0, 0, 0, 0,
+                    Native.SWP_NOMOVE | Native.SWP_NOSIZE | Native.SWP_NOACTIVATE);
+            }
+            else if (a.IsTopmost)
+            {
+                bool ok = Native.SetWindowPos(a.Hwnd, Native.HWND_NOTOPMOST, 0, 0, 0, 0,
+                    Native.SWP_NOMOVE | Native.SWP_NOSIZE | Native.SWP_NOACTIVATE);
+                if (ok) a.IsTopmost = false;
+                Log.Write($"topmost cleared for {a.Hwnd} (fg={foreground}, ok={ok})");
+            }
         }
     }
 

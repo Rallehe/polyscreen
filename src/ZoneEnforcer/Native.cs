@@ -39,6 +39,7 @@ public static class Native
     public const long WS_EX_NOACTIVATE = 0x08000000L;
 
     // SetWindowPos flags
+    public static readonly IntPtr HWND_TOP = IntPtr.Zero;
     public static readonly IntPtr HWND_TOPMOST = new(-1);
     public static readonly IntPtr HWND_NOTOPMOST = new(-2);
     public const uint SWP_NOSIZE = 0x0001;
