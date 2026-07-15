@@ -193,6 +193,27 @@ public class TrayContext : ApplicationContext
             };
             layoutMenu.DropDownItems.Add(item);
         }
+        if (_engine.Config.Layouts.Count > 1)
+        {
+            layoutMenu.DropDownItems.Add(new ToolStripSeparator());
+            var deleteMenu = new ToolStripMenuItem("Delete layout");
+            foreach (var name in _engine.Config.Layouts.Keys)
+            {
+                deleteMenu.DropDownItems.Add(new ToolStripMenuItem(name, null, (_, _) =>
+                {
+                    if (MessageBox.Show($"Delete layout '{name}'?", "ZoneEnforcer",
+                            MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+                    bool wasActive = name.Equals(_engine.Config.ActiveLayout, StringComparison.OrdinalIgnoreCase);
+                    if (wasActive) CloseAllBlackouts();
+                    var error = _engine.DeleteLayout(name);
+                    if (error != null) Notify(error);
+                    else Notify(wasActive
+                        ? $"Deleted '{name}', switched to '{_engine.Config.ActiveLayout}'"
+                        : $"Deleted '{name}'");
+                }));
+            }
+            layoutMenu.DropDownItems.Add(deleteMenu);
+        }
         menu.Items.Add(layoutMenu);
 
         menu.Items.Add(new ToolStripMenuItem("Edit layout…", null, (_, _) => OpenEditor()));
@@ -314,6 +335,18 @@ public class TrayContext : ApplicationContext
                 if (args.Length < 2)
                     return "layouts: " + string.Join(", ",
                         _engine.Config.Layouts.Keys.Select(k => k == _engine.Config.ActiveLayout ? k + " (active)" : k));
+                if (args.Length >= 3 &&
+                    (args[1].Equals("delete", StringComparison.OrdinalIgnoreCase) ||
+                     args[1].Equals("remove", StringComparison.OrdinalIgnoreCase)))
+                {
+                    bool wasActive = args[2].Equals(_engine.Config.ActiveLayout, StringComparison.OrdinalIgnoreCase);
+                    if (wasActive) CloseAllBlackouts();
+                    var error = _engine.DeleteLayout(args[2]);
+                    if (error != null) return error;
+                    return wasActive
+                        ? $"deleted '{args[2]}', active layout -> {_engine.Config.ActiveLayout}"
+                        : $"deleted '{args[2]}'";
+                }
                 if (!_engine.Config.Layouts.ContainsKey(args[1])) return $"unknown layout '{args[1]}'";
                 CloseAllBlackouts();
                 _engine.SetLayout(args[1]);
@@ -389,6 +422,7 @@ public class TrayContext : ApplicationContext
           release <process-or-title> | all   restore a window
           list                               show zones and assigned windows
           layout [name]                      show or switch layout
+          layout delete <name>               delete a layout
           blackout <zone> | blackout off     toggle a black panel over a zone
           edit [close]                       open the visual layout editor
           zones                              flash the zone overlay

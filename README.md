@@ -39,6 +39,7 @@ ZoneEnforcer.exe assign left notepad     # match by process name or title substr
 ZoneEnforcer.exe assign right "YouTube"
 ZoneEnforcer.exe release notepad         # or: release all
 ZoneEnforcer.exe layout thirds           # switch layout; bare "layout" lists them
+ZoneEnforcer.exe layout delete thirds    # delete a layout (also in the tray's Layout menu)
 ZoneEnforcer.exe blackout left           # toggle a black panel over a zone ("blackout off" restores all)
 ZoneEnforcer.exe edit                    # open the visual layout editor ("edit close" cancels)
 ZoneEnforcer.exe zones                   # flash the overlay
