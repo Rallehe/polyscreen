@@ -58,6 +58,7 @@ public class TrayContext : ApplicationContext
         _tray.DoubleClick += (_, _) => OverlayForm.Flash(_engine.Config.ActiveZones);
 
         _pipe = new PipeServer(_marshal, HandleCommand);
+        StartupManager.HealPathIfStale();
         Log.Write($"started, layout '{_engine.Config.ActiveLayout}', config {Config.ConfigPath}");
     }
 
@@ -240,6 +241,14 @@ public class TrayContext : ApplicationContext
         }));
         menu.Items.Add(new ToolStripMenuItem("Open config file", null, (_, _) =>
             System.Diagnostics.Process.Start("notepad.exe", Config.ConfigPath)));
+        menu.Items.Add(new ToolStripMenuItem("Run at startup", null, (_, _) =>
+        {
+            if (StartupManager.IsEnabled) StartupManager.Disable();
+            else StartupManager.Enable();
+        })
+        {
+            Checked = StartupManager.IsEnabled,
+        });
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Exit", null, (_, _) => ExitThread()));
     }
@@ -339,6 +348,22 @@ public class TrayContext : ApplicationContext
             case "zones":
                 OverlayForm.Flash(_engine.Config.ActiveZones);
                 return string.Join(Environment.NewLine, _engine.Config.ActiveZones.Select(z => z.ToString()));
+            case "startup":
+            {
+                if (args.Length < 2)
+                    return $"run at startup: {(StartupManager.IsEnabled ? "on" : "off")} (usage: startup on|off)";
+                if (args[1].Equals("on", StringComparison.OrdinalIgnoreCase))
+                {
+                    StartupManager.Enable();
+                    return "run at startup: on";
+                }
+                if (args[1].Equals("off", StringComparison.OrdinalIgnoreCase))
+                {
+                    StartupManager.Disable();
+                    return "run at startup: off";
+                }
+                return "usage: startup on|off";
+            }
             case "reset":
             {
                 int n = _engine.Assignments.Count;
@@ -368,6 +393,7 @@ public class TrayContext : ApplicationContext
           edit [close]                       open the visual layout editor
           zones                              flash the zone overlay
           reset                              release all windows and blackouts
+          startup [on|off]                   run ZoneEnforcer when Windows starts
           reload                             reload config.json
           quit                               exit ZoneEnforcer
         Hotkeys: Ctrl+Alt+1..9 assign focused window, Ctrl+Alt+0 release,

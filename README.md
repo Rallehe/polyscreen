@@ -43,6 +43,7 @@ ZoneEnforcer.exe blackout left           # toggle a black panel over a zone ("bl
 ZoneEnforcer.exe edit                    # open the visual layout editor ("edit close" cancels)
 ZoneEnforcer.exe zones                   # flash the overlay
 ZoneEnforcer.exe reset                   # release all windows and blackouts
+ZoneEnforcer.exe startup on              # run when Windows starts (also in the tray menu)
 ZoneEnforcer.exe reload                  # re-read config.json
 ZoneEnforcer.exe quit
 ```
