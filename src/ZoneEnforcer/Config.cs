@@ -10,6 +10,7 @@ public class Zone
     public int Y { get; set; }
     public int Width { get; set; }
     public int Height { get; set; }
+    public bool Contains(int px, int py) => px >= X && px < X + Width && py >= Y && py < Y + Height;
     public override string ToString() => $"{Name} ({X},{Y} {Width}x{Height})";
 }
 

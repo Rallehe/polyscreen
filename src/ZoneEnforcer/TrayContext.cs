@@ -30,11 +30,14 @@ public class TrayContext : ApplicationContext
 {
     private const int HotkeyReleaseId = 10;
     private const int HotkeyZonesId = 11;
+    private const int HotkeyBlackoutId = 12;
 
     private readonly Engine _engine;
     private readonly MarshalForm _marshal;
     private readonly NotifyIcon _tray;
     private readonly PipeServer _pipe;
+    private readonly Dictionary<string, BlackoutForm> _blackouts = new(StringComparer.OrdinalIgnoreCase);
+    private LayoutEditorForm? _editor;
 
     public TrayContext()
     {
@@ -64,6 +67,7 @@ public class TrayContext : ApplicationContext
             Native.RegisterHotKey(_marshal.Handle, i, mods, (uint)('0' + i)); // Ctrl+Alt+1..9: assign
         Native.RegisterHotKey(_marshal.Handle, HotkeyReleaseId, mods, '0');   // Ctrl+Alt+0: release
         Native.RegisterHotKey(_marshal.Handle, HotkeyZonesId, mods, 'Z');     // Ctrl+Alt+Z: show zones
+        Native.RegisterHotKey(_marshal.Handle, HotkeyBlackoutId, mods, 'B');  // Ctrl+Alt+B: black out zone under cursor
     }
 
     private void OnHotkey(int id)
@@ -71,6 +75,14 @@ public class TrayContext : ApplicationContext
         if (id == HotkeyZonesId)
         {
             OverlayForm.Flash(_engine.Config.ActiveZones);
+            return;
+        }
+
+        if (id == HotkeyBlackoutId)
+        {
+            Native.GetCursorPos(out var pt);
+            var z = _engine.Config.ActiveZones.FirstOrDefault(z => z.Contains(pt.X, pt.Y));
+            if (z != null) ToggleBlackout(z);
             return;
         }
 
@@ -95,6 +107,45 @@ public class TrayContext : ApplicationContext
             Notify($"{Native.GetWindowTitle(hwnd)} → {zone.Name}");
     }
 
+    private void ToggleBlackout(Zone zone)
+    {
+        if (_blackouts.Remove(zone.Name, out var form))
+        {
+            form.Close();
+            return;
+        }
+        var f = new BlackoutForm(zone);
+        f.FormClosed += (_, _) => _blackouts.Remove(f.ZoneName);
+        _blackouts[zone.Name] = f;
+        f.Show();
+    }
+
+    private void CloseAllBlackouts()
+    {
+        foreach (var f in _blackouts.Values.ToList()) f.Close();
+        _blackouts.Clear();
+    }
+
+    private void OpenEditor()
+    {
+        if (_editor != null && !_editor.IsDisposed)
+        {
+            _editor.Activate();
+            return;
+        }
+        CloseAllBlackouts();
+        var screen = Screen.PrimaryScreen!.Bounds;
+        _editor = new LayoutEditorForm(screen, _engine.Config.ActiveLayout, _engine.Config.ActiveZones,
+            (name, zones) =>
+            {
+                _engine.Config.Layouts[name] = zones;
+                _engine.SetLayout(name); // persists the config and re-clamps assigned windows
+                OverlayForm.Flash(zones);
+            });
+        _editor.FormClosed += (_, _) => _editor = null;
+        _editor.Show();
+    }
+
     private void Notify(string text)
     {
         _tray.BalloonTipTitle = "ZoneEnforcer";
@@ -113,13 +164,35 @@ public class TrayContext : ApplicationContext
         var layoutMenu = new ToolStripMenuItem("Layout");
         foreach (var name in _engine.Config.Layouts.Keys)
         {
-            var item = new ToolStripMenuItem(name, null, (_, _) => _engine.SetLayout(name))
+            var item = new ToolStripMenuItem(name, null, (_, _) =>
+            {
+                CloseAllBlackouts();
+                _engine.SetLayout(name);
+            })
             {
                 Checked = name == _engine.Config.ActiveLayout,
             };
             layoutMenu.DropDownItems.Add(item);
         }
         menu.Items.Add(layoutMenu);
+
+        menu.Items.Add(new ToolStripMenuItem("Edit layout…", null, (_, _) => OpenEditor()));
+
+        var blackoutMenu = new ToolStripMenuItem("Black out zone  (Ctrl+Alt+B)");
+        foreach (var zone in _engine.Config.ActiveZones)
+        {
+            var z = zone;
+            blackoutMenu.DropDownItems.Add(new ToolStripMenuItem(z.Name, null, (_, _) => ToggleBlackout(z))
+            {
+                Checked = _blackouts.ContainsKey(z.Name),
+            });
+        }
+        if (_blackouts.Count > 0)
+        {
+            blackoutMenu.DropDownItems.Add(new ToolStripSeparator());
+            blackoutMenu.DropDownItems.Add(new ToolStripMenuItem("Restore all", null, (_, _) => CloseAllBlackouts()));
+        }
+        menu.Items.Add(blackoutMenu);
 
         var assigned = new ToolStripMenuItem("Assigned windows");
         foreach (var a in _engine.Assignments.Values)
@@ -142,7 +215,11 @@ public class TrayContext : ApplicationContext
 
         menu.Items.Add(new ToolStripMenuItem("Release all", null, (_, _) => _engine.ReleaseAll()));
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(new ToolStripMenuItem("Reload config", null, (_, _) => _engine.ReloadConfig()));
+        menu.Items.Add(new ToolStripMenuItem("Reload config", null, (_, _) =>
+        {
+            CloseAllBlackouts();
+            _engine.ReloadConfig();
+        }));
         menu.Items.Add(new ToolStripMenuItem("Open config file", null, (_, _) =>
             System.Diagnostics.Process.Start("notepad.exe", Config.ConfigPath)));
         menu.Items.Add(new ToolStripSeparator());
@@ -201,6 +278,8 @@ public class TrayContext : ApplicationContext
                     Native.GetWindowRect(a.Hwnd, out var r);
                     sb.AppendLine($"  \"{Native.GetWindowTitle(a.Hwnd)}\" ({Native.GetProcessName(a.Hwnd)}) -> {a.Zone.Name} @ {r}");
                 }
+                if (_blackouts.Count > 0)
+                    sb.AppendLine($"blacked out: {string.Join(", ", _blackouts.Keys)}");
                 return sb.ToString();
             }
             case "layout":
@@ -209,13 +288,41 @@ public class TrayContext : ApplicationContext
                     return "layouts: " + string.Join(", ",
                         _engine.Config.Layouts.Keys.Select(k => k == _engine.Config.ActiveLayout ? k + " (active)" : k));
                 if (!_engine.Config.Layouts.ContainsKey(args[1])) return $"unknown layout '{args[1]}'";
+                CloseAllBlackouts();
                 _engine.SetLayout(args[1]);
                 return $"layout -> {args[1]}";
+            }
+            case "blackout":
+            {
+                if (args.Length < 2) return "usage: blackout <zone> | blackout off";
+                if (args[1].Equals("off", StringComparison.OrdinalIgnoreCase))
+                {
+                    CloseAllBlackouts();
+                    return "all zones restored";
+                }
+                var zone = _engine.Config.FindZone(args[1]);
+                if (zone == null)
+                    return $"unknown zone '{args[1]}'. zones: {string.Join(", ", _engine.Config.ActiveZones.Select(z => z.Name))}";
+                ToggleBlackout(zone);
+                return _blackouts.ContainsKey(zone.Name)
+                    ? $"zone '{zone.Name}' blacked out"
+                    : $"zone '{zone.Name}' restored";
+            }
+            case "edit":
+            {
+                if (args.Length > 1 && args[1].Equals("close", StringComparison.OrdinalIgnoreCase))
+                {
+                    _editor?.Close();
+                    return "editor closed";
+                }
+                OpenEditor();
+                return "layout editor opened (Enter saves, Esc cancels)";
             }
             case "zones":
                 OverlayForm.Flash(_engine.Config.ActiveZones);
                 return string.Join(Environment.NewLine, _engine.Config.ActiveZones.Select(z => z.ToString()));
             case "reload":
+                CloseAllBlackouts();
                 _engine.ReloadConfig();
                 return $"config reloaded from {Config.ConfigPath}";
             case "quit":
@@ -232,18 +339,23 @@ public class TrayContext : ApplicationContext
           release <process-or-title> | all   restore a window
           list                               show zones and assigned windows
           layout [name]                      show or switch layout
+          blackout <zone> | blackout off     toggle a black panel over a zone
+          edit [close]                       open the visual layout editor
           zones                              flash the zone overlay
           reload                             reload config.json
           quit                               exit ZoneEnforcer
-        Hotkeys: Ctrl+Alt+1..9 assign focused window, Ctrl+Alt+0 release, Ctrl+Alt+Z show zones.
+        Hotkeys: Ctrl+Alt+1..9 assign focused window, Ctrl+Alt+0 release,
+                 Ctrl+Alt+Z show zones, Ctrl+Alt+B black out zone under cursor.
         """;
 
     protected override void ExitThreadCore()
     {
         _tray.Visible = false;
+        CloseAllBlackouts();
+        _editor?.Close();
         _pipe.Dispose();
         _engine.Dispose(); // releases all windows back to their original state
-        for (int i = 1; i <= HotkeyZonesId; i++) Native.UnregisterHotKey(_marshal.Handle, i);
+        for (int i = 1; i <= HotkeyBlackoutId; i++) Native.UnregisterHotKey(_marshal.Handle, i);
         base.ExitThreadCore();
     }
 }

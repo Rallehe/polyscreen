@@ -3,7 +3,7 @@ namespace ZoneEnforcer;
 /// <summary>Translucent flash showing where the zones of the active layout sit.</summary>
 public class OverlayForm : Form
 {
-    private static readonly Color[] Palette =
+    public static readonly Color[] Palette =
     {
         Color.FromArgb(0, 120, 215),   // blue
         Color.FromArgb(16, 137, 62),   // green

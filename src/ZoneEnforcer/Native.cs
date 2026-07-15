@@ -35,6 +35,7 @@ public static class Native
     public const long WS_MINIMIZEBOX = 0x00020000L;
     public const long WS_MAXIMIZEBOX = 0x00010000L;
     public const long WS_EX_TOOLWINDOW = 0x00000080L;
+    public const long WS_EX_NOACTIVATE = 0x08000000L;
 
     // SetWindowPos flags
     public const uint SWP_NOZORDER = 0x0004;
@@ -88,6 +89,12 @@ public static class Native
 
     [DllImport("user32.dll")]
     public static extern IntPtr GetForegroundWindow();
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct POINT { public int X, Y; }
+
+    [DllImport("user32.dll")]
+    public static extern bool GetCursorPos(out POINT lpPoint);
 
     [DllImport("user32.dll")]
     public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);

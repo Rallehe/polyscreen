@@ -26,6 +26,7 @@ instance (see CLI below).
 | `Ctrl+Alt+1..9` | Assign the focused window to zone 1..9 of the active layout |
 | `Ctrl+Alt+0` | Release the focused window (restores border and position) |
 | `Ctrl+Alt+Z` | Flash the zone overlay (also: double-click the tray icon) |
+| `Ctrl+Alt+B` | Black out / restore the zone under the mouse cursor |
 
 ## CLI
 
@@ -37,10 +38,28 @@ ZoneEnforcer.exe assign left notepad     # match by process name or title substr
 ZoneEnforcer.exe assign right "YouTube"
 ZoneEnforcer.exe release notepad         # or: release all
 ZoneEnforcer.exe layout thirds           # switch layout; bare "layout" lists them
+ZoneEnforcer.exe blackout left           # toggle a black panel over a zone ("blackout off" restores all)
+ZoneEnforcer.exe edit                    # open the visual layout editor ("edit close" cancels)
 ZoneEnforcer.exe zones                   # flash the overlay
 ZoneEnforcer.exe reload                  # re-read config.json
 ZoneEnforcer.exe quit
 ```
+
+## Layout editor
+
+"Edit layout…" in the tray menu (or `ZoneEnforcer.exe edit`) opens a fullscreen FancyZones-style
+editor: **click** a zone to split it vertically at the cursor, **Shift+click** to split
+horizontally, **drag** a shared border to resize (snaps to halves, thirds, and quarters),
+**right-click** a zone to remove it, **Enter** to save under a name, **Esc** to cancel. Zones live
+in a binary split tree, so the layout always tiles the screen exactly. Saving with an existing
+layout name overwrites it; a new name creates a new layout and switches to it.
+
+## Blacking out a zone
+
+Any zone can be covered with a pure-black, click-proof, never-focused panel — on an OLED that
+means the pixels are simply off, like the "display" is powered down. Toggle it from the tray menu,
+with `Ctrl+Alt+B` (zone under the mouse), or via the CLI. Double-click a blacked-out zone to
+restore it.
 
 ## Config
 
