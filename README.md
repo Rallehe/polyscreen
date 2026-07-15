@@ -1,13 +1,18 @@
 # ZoneEnforcer
 
-Turns regions of a super-ultrawide monitor (built for a 5120×1440 Samsung Odyssey G9) into
-"virtual monitors" — without display drivers, added latency, or fooling Windows.
+Split one large monitor into virtual "screens". Define zones, assign windows to them, and each
+window is made borderless and kept clamped to its zone — even when it tries to go fullscreen.
+Fullscreen video fills its zone instead of the whole monitor, and a game in windowed or
+borderless mode stays pinned to its zone as if it were running on its own display.
 
-Instead of faking extra displays, ZoneEnforcer fools the *apps*: a window assigned to a zone is
-made borderless and clamped to that zone, and a WinEvent watchdog instantly re-clamps it whenever
-the app tries to go fullscreen, maximize, or move itself. Hitting fullscreen on a YouTube video
-fills *your zone*, not the whole panel. A game in borderless/windowed mode stays pinned to its
-zone like it's running on its own monitor.
+No display drivers, no added latency, no changes to your display configuration — a watchdog
+re-applies the window's position the instant an app tries to move, maximize, or fullscreen
+itself. Releasing a window restores its original border and position.
+
+## Requirements
+
+- Windows 10/11
+- [.NET 10 SDK](https://dotnet.microsoft.com/download) to build
 
 ## Build & run
 
@@ -60,10 +65,10 @@ layout name overwrites it; a new name creates a new layout and switches to it.
 
 ## Blacking out a zone
 
-Any zone can be covered with a pure-black, click-proof, never-focused panel — on an OLED that
-means the pixels are simply off, like the "display" is powered down. Toggle it from the tray menu,
-with `Ctrl+Alt+B` (zone under the mouse), or via the CLI. Double-click a blacked-out zone to
-restore it.
+Any zone can be covered with a pure-black, click-proof, never-focused panel — like turning that
+"screen" off (on OLED panels the pixels are literally off). Toggle it from the tray menu, with
+`Ctrl+Alt+B` (zone under the mouse), or via the CLI. Double-click a blacked-out zone to restore
+it.
 
 ## Config
 
@@ -97,6 +102,6 @@ traffic is written to `%APPDATA%\ZoneEnforcer\log.txt`.
   border and handles the rest. Most modern games default to borderless anyway.
 - **Elevated (admin) windows** can't be moved by a non-elevated process. Run ZoneEnforcer as
   administrator if you need to clamp them.
-- A clamped game renders at the zone's resolution (e.g. 2560×1440), which is what you want — but
-  a few stubborn engines re-fullscreen themselves in a loop; the watchdog wins, but if it flickers,
+- A clamped game renders at the zone's resolution, which is usually what you want — but a few
+  stubborn engines re-fullscreen themselves in a loop; the watchdog wins, but if it flickers,
   prefer the game's own windowed mode.
