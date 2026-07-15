@@ -9,6 +9,10 @@ No display drivers, no added latency, no changes to your display configuration â
 re-applies the window's position the instant an app tries to move, maximize, or fullscreen
 itself. Releasing a window restores its original border and position.
 
+The focused clamped window goes always-on-top so it covers the taskbar, just like a real
+fullscreen app; it drops back the moment focus moves elsewhere. Toggleable in the tray menu
+("Focused window covers taskbar") or with `ontop on|off`.
+
 ## Requirements
 
 - Windows 10/11
@@ -50,6 +54,7 @@ ZoneEnforcer.exe edit                    # open the visual layout editor ("edit 
 ZoneEnforcer.exe zones                   # flash the overlay
 ZoneEnforcer.exe reset                   # release all windows and blackouts
 ZoneEnforcer.exe startup on              # run when Windows starts (also in the tray menu)
+ZoneEnforcer.exe ontop off               # focused window no longer covers the taskbar (default: on)
 ZoneEnforcer.exe reload                  # re-read config.json
 ZoneEnforcer.exe quit
 ```

@@ -262,6 +262,11 @@ public class TrayContext : ApplicationContext
         }));
         menu.Items.Add(new ToolStripMenuItem("Open config file", null, (_, _) =>
             System.Diagnostics.Process.Start("notepad.exe", Config.ConfigPath)));
+        menu.Items.Add(new ToolStripMenuItem("Focused window covers taskbar", null, (_, _) =>
+            _engine.SetTopmostOnFocus(!_engine.Config.TopmostOnFocus))
+        {
+            Checked = _engine.Config.TopmostOnFocus,
+        });
         menu.Items.Add(new ToolStripMenuItem("Run at startup", null, (_, _) =>
         {
             if (StartupManager.IsEnabled) StartupManager.Disable();
@@ -381,6 +386,22 @@ public class TrayContext : ApplicationContext
             case "zones":
                 OverlayForm.Flash(_engine.Config.ActiveZones);
                 return string.Join(Environment.NewLine, _engine.Config.ActiveZones.Select(z => z.ToString()));
+            case "ontop":
+            {
+                if (args.Length < 2)
+                    return $"focused window covers taskbar: {(_engine.Config.TopmostOnFocus ? "on" : "off")} (usage: ontop on|off)";
+                if (args[1].Equals("on", StringComparison.OrdinalIgnoreCase))
+                {
+                    _engine.SetTopmostOnFocus(true);
+                    return "focused window covers taskbar: on";
+                }
+                if (args[1].Equals("off", StringComparison.OrdinalIgnoreCase))
+                {
+                    _engine.SetTopmostOnFocus(false);
+                    return "focused window covers taskbar: off";
+                }
+                return "usage: ontop on|off";
+            }
             case "startup":
             {
                 if (args.Length < 2)
@@ -428,6 +449,7 @@ public class TrayContext : ApplicationContext
           zones                              flash the zone overlay
           reset                              release all windows and blackouts
           startup [on|off]                   run ZoneEnforcer when Windows starts
+          ontop [on|off]                     focused clamped window covers the taskbar
           reload                             reload config.json
           quit                               exit ZoneEnforcer
         Hotkeys: Ctrl+Alt+1..9 assign focused window, Ctrl+Alt+0 release,

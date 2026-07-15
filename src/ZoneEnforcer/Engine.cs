@@ -8,6 +8,7 @@ public class Assignment
     public IntPtr OrigExStyle;
     public RECT OrigRect;
     public bool WasMaximized;
+    public bool IsTopmost;
     public DateTime LastEnforce = DateTime.MinValue;
 }
 
@@ -21,6 +22,7 @@ public class Engine : IDisposable
     private readonly Dictionary<IntPtr, Assignment> _assignments = new();
     private readonly Native.WinEventDelegate _hookProc; // field keeps the delegate alive for the native hook
     private IntPtr _hook;
+    private IntPtr _fgHook;
     private readonly System.Windows.Forms.Timer _poll;
     private static readonly TimeSpan EnforceThrottle = TimeSpan.FromMilliseconds(50);
 
@@ -32,6 +34,8 @@ public class Engine : IDisposable
         Config = config;
         _hookProc = OnWinEvent;
         _hook = Native.SetWinEventHook(Native.EVENT_OBJECT_DESTROY, Native.EVENT_OBJECT_LOCATIONCHANGE,
+            IntPtr.Zero, _hookProc, 0, 0, Native.WINEVENT_OUTOFCONTEXT);
+        _fgHook = Native.SetWinEventHook(Native.EVENT_SYSTEM_FOREGROUND, Native.EVENT_SYSTEM_FOREGROUND,
             IntPtr.Zero, _hookProc, 0, 0, Native.WINEVENT_OUTOFCONTEXT);
 
         // Safety net for events missed while throttled, and for cleanup of dead windows.
@@ -113,8 +117,33 @@ public class Engine : IDisposable
         _assignments[hwnd] = a;
         Log.Write($"assign {hwnd} \"{Native.GetWindowTitle(hwnd)}\" -> {zone}");
         Enforce(a, force: true);
+        UpdateTopmost(Native.GetForegroundWindow());
         AssignmentsChanged?.Invoke();
         return true;
+    }
+
+    /// <summary>
+    /// The focused clamped window goes always-on-top so it covers the taskbar the way a
+    /// real fullscreen window would; it drops back as soon as focus moves elsewhere.
+    /// </summary>
+    private void UpdateTopmost(IntPtr foreground)
+    {
+        foreach (var a in _assignments.Values)
+        {
+            bool onTop = Config.TopmostOnFocus && a.Hwnd == foreground;
+            if (onTop == a.IsTopmost) continue;
+            bool ok = Native.SetWindowPos(a.Hwnd, onTop ? Native.HWND_TOPMOST : Native.HWND_NOTOPMOST,
+                0, 0, 0, 0, Native.SWP_NOMOVE | Native.SWP_NOSIZE | Native.SWP_NOACTIVATE);
+            if (ok) a.IsTopmost = onTop;
+            Log.Write($"topmost {(onTop ? "set" : "cleared")} for {a.Hwnd} (fg={foreground}, ok={ok})");
+        }
+    }
+
+    public void SetTopmostOnFocus(bool enabled)
+    {
+        Config.TopmostOnFocus = enabled;
+        Config.Save();
+        UpdateTopmost(Native.GetForegroundWindow());
     }
 
     public bool Release(IntPtr hwnd)
@@ -123,6 +152,8 @@ public class Engine : IDisposable
         Log.Write($"release {hwnd} \"{Native.GetWindowTitle(hwnd)}\"");
         if (Native.IsWindow(hwnd))
         {
+            Native.SetWindowPos(hwnd, Native.HWND_NOTOPMOST, 0, 0, 0, 0,
+                Native.SWP_NOMOVE | Native.SWP_NOSIZE | Native.SWP_NOACTIVATE);
             Native.SetWindowLongPtr(hwnd, Native.GWL_STYLE, a.OrigStyle);
             Native.SetWindowLongPtr(hwnd, Native.GWL_EXSTYLE, a.OrigExStyle);
             ApplyDwmDecoration(hwnd, clamped: false);
@@ -147,6 +178,10 @@ public class Engine : IDisposable
 
         switch (eventType)
         {
+            case Native.EVENT_SYSTEM_FOREGROUND:
+                UpdateTopmost(hwnd);
+                break;
+
             case Native.EVENT_OBJECT_DESTROY:
                 if (_assignments.Remove(hwnd)) AssignmentsChanged?.Invoke();
                 break;
@@ -263,6 +298,11 @@ public class Engine : IDisposable
         {
             Native.UnhookWinEvent(_hook);
             _hook = IntPtr.Zero;
+        }
+        if (_fgHook != IntPtr.Zero)
+        {
+            Native.UnhookWinEvent(_fgHook);
+            _fgHook = IntPtr.Zero;
         }
         ReleaseAll();
     }
