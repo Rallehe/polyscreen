@@ -69,6 +69,24 @@ public class Engine : IDisposable
         AssignmentsChanged?.Invoke();
     }
 
+    /// <summary>Deletes a layout (case-insensitive). Returns an error message, or null on success.</summary>
+    public string? DeleteLayout(string name)
+    {
+        var key = Config.Layouts.Keys.FirstOrDefault(k =>
+            k.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (key == null) return $"unknown layout '{name}'";
+        if (Config.Layouts.Count == 1) return "cannot delete the only layout";
+
+        bool wasActive = key.Equals(Config.ActiveLayout, StringComparison.OrdinalIgnoreCase);
+        Config.Layouts.Remove(key);
+        Log.Write($"layout deleted: {key}");
+
+        if (wasActive) SetLayout(Config.Layouts.Keys.First()); // re-resolves zones and saves
+        else Config.Save();
+        AssignmentsChanged?.Invoke();
+        return null;
+    }
+
     public bool Assign(IntPtr hwnd, Zone zone)
     {
         if (hwnd == IntPtr.Zero || !Native.IsWindow(hwnd)) return false;
