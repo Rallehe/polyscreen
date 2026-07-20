@@ -48,9 +48,9 @@ ZoneEnforcer.exe assign left notepad     # match by process name or title substr
 ZoneEnforcer.exe assign right "YouTube"
 ZoneEnforcer.exe release notepad         # or: release all
 ZoneEnforcer.exe layout thirds           # switch layout; bare "layout" lists them
-ZoneEnforcer.exe layout delete thirds    # delete a layout (also in the tray's Forced Zones menu)
+ZoneEnforcer.exe layout delete thirds    # delete a layout (also in the tray's Delete layout menu)
 ZoneEnforcer.exe blackout left           # toggle a black panel over a zone ("blackout off" restores all)
-ZoneEnforcer.exe edit                    # open the visual layout editor ("edit close" cancels)
+ZoneEnforcer.exe edit Coding             # edit a layout (bare "edit" = active, "edit new" = create)
 ZoneEnforcer.exe zones                   # flash the overlay
 ZoneEnforcer.exe reset                   # release all windows and blackouts
 ZoneEnforcer.exe startup on              # run when Windows starts (also in the tray menu)
@@ -73,8 +73,10 @@ same layout or different ones. Disable the feature entirely with the same submen
 
 ## Layout editor
 
-"Edit layout…" in the tray menu (or `ZoneEnforcer.exe edit`) opens a fullscreen FancyZones-style
-editor: **click** a zone to split it vertically at the cursor, **Shift+click** to split
+The tray menu has "Create layout…" (blank canvas), "Edit layout" (pick one), and "Delete layout"
+(pick one, with confirmation); `ZoneEnforcer.exe edit [name|new]` does the same from the CLI.
+The editor is fullscreen and FancyZones-style: **click** a zone to split it vertically at the
+cursor, **Shift+click** to split
 horizontally, **drag** a shared border to resize (snaps to halves, thirds, and quarters),
 **right-click** a zone to remove it, **Enter** to save under a name, **Esc** to cancel. Zones live
 in a binary split tree, so the layout always tiles the screen exactly. Saving with an existing

@@ -147,7 +147,8 @@ public class TrayContext : ApplicationContext
         _blackouts.Clear();
     }
 
-    private void OpenEditor()
+    /// <summary>Open the visual editor for a layout, or with a blank canvas when null (create).</summary>
+    private void OpenEditor(string? layoutName)
     {
         if (_editor != null && !_editor.IsDisposed)
         {
@@ -156,13 +157,17 @@ public class TrayContext : ApplicationContext
         }
         CloseAllBlackouts();
         var screen = Screen.PrimaryScreen!.Bounds;
-        _engine.Config.Layouts.TryGetValue(_engine.Config.ActiveLayout, out var activeDef);
-        _editor = new LayoutEditorForm(screen, _engine.Config.ActiveLayout, _engine.Config.ActiveZones,
-            activeDef?.OverTaskbar ?? false,
+        LayoutDef? def = null;
+        if (layoutName != null) _engine.Config.Layouts.TryGetValue(layoutName, out def);
+        _editor = new LayoutEditorForm(screen, layoutName ?? "", def?.Zones ?? new List<Zone>(),
+            def?.OverTaskbar ?? false,
             (name, zones, overTaskbar) =>
             {
                 _engine.Config.Layouts[name] = new LayoutDef { Zones = zones, OverTaskbar = overTaskbar };
-                _engine.SetLayout(name); // persists the config and re-clamps assigned windows
+                if (name.Equals(_engine.Config.ActiveLayout, StringComparison.OrdinalIgnoreCase))
+                    _engine.SetLayout(_engine.Config.ActiveLayout); // re-clamp assigned windows to the new zones
+                else
+                    _engine.Config.Save();
                 OverlayForm.Flash(zones);
             });
         _editor.FormClosed += (_, _) => _editor = null;
@@ -197,30 +202,35 @@ public class TrayContext : ApplicationContext
             };
             layoutMenu.DropDownItems.Add(item);
         }
-        if (_engine.Config.Layouts.Count > 1)
-        {
-            layoutMenu.DropDownItems.Add(new ToolStripSeparator());
-            var deleteMenu = new ToolStripMenuItem("Delete layout");
-            foreach (var name in _engine.Config.Layouts.Keys)
-            {
-                deleteMenu.DropDownItems.Add(new ToolStripMenuItem(name, null, (_, _) =>
-                {
-                    if (MessageBox.Show($"Delete layout '{name}'?", "ZoneEnforcer",
-                            MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
-                    bool wasActive = name.Equals(_engine.Config.ActiveLayout, StringComparison.OrdinalIgnoreCase);
-                    if (wasActive) CloseAllBlackouts();
-                    var error = _engine.DeleteLayout(name);
-                    if (error != null) Notify(error);
-                    else Notify(wasActive
-                        ? $"Deleted '{name}', switched to '{_engine.Config.ActiveLayout}'"
-                        : $"Deleted '{name}'");
-                }));
-            }
-            layoutMenu.DropDownItems.Add(deleteMenu);
-        }
         menu.Items.Add(layoutMenu);
 
-        menu.Items.Add(new ToolStripMenuItem("Edit layout…", null, (_, _) => OpenEditor()));
+        menu.Items.Add(new ToolStripMenuItem("Create layout…", null, (_, _) => OpenEditor(null)));
+
+        var editMenu = new ToolStripMenuItem("Edit layout");
+        foreach (var name in _engine.Config.Layouts.Keys)
+            editMenu.DropDownItems.Add(new ToolStripMenuItem(name, null, (_, _) => OpenEditor(name)));
+        menu.Items.Add(editMenu);
+
+        var deleteMenu = new ToolStripMenuItem("Delete layout")
+        {
+            Enabled = _engine.Config.Layouts.Count > 1,
+        };
+        foreach (var name in _engine.Config.Layouts.Keys)
+        {
+            deleteMenu.DropDownItems.Add(new ToolStripMenuItem(name, null, (_, _) =>
+            {
+                if (MessageBox.Show($"Delete layout '{name}'?", "ZoneEnforcer",
+                        MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+                bool wasActive = name.Equals(_engine.Config.ActiveLayout, StringComparison.OrdinalIgnoreCase);
+                if (wasActive) CloseAllBlackouts();
+                var error = _engine.DeleteLayout(name);
+                if (error != null) Notify(error);
+                else Notify(wasActive
+                    ? $"Deleted '{name}', switched to '{_engine.Config.ActiveLayout}'"
+                    : $"Deleted '{name}'");
+            }));
+        }
+        menu.Items.Add(deleteMenu);
 
         var blackoutMenu = new ToolStripMenuItem("Black out zone  (Ctrl+Alt+B)");
         foreach (var zone in _engine.Config.ActiveZones)
@@ -411,8 +421,18 @@ public class TrayContext : ApplicationContext
                     _editor?.Close();
                     return "editor closed";
                 }
-                OpenEditor();
-                return "layout editor opened (Enter saves, Esc cancels)";
+                if (args.Length > 1 && args[1].Equals("new", StringComparison.OrdinalIgnoreCase))
+                {
+                    OpenEditor(null);
+                    return "layout editor opened with a blank canvas (Enter saves, Esc cancels)";
+                }
+                string? target = args.Length > 1
+                    ? _engine.Config.Layouts.Keys.FirstOrDefault(k =>
+                        k.Equals(string.Join(' ', args[1..]), StringComparison.OrdinalIgnoreCase))
+                    : _engine.Config.ActiveLayout;
+                if (target == null) return $"unknown layout '{string.Join(' ', args[1..])}'";
+                OpenEditor(target);
+                return $"layout editor opened for '{target}' (Enter saves, Esc cancels)";
             }
             case "zones":
                 OverlayForm.Flash(_engine.Config.ActiveZones);
@@ -506,7 +526,7 @@ public class TrayContext : ApplicationContext
           layout [name]                      show or switch the Forced Zones layout
           layout delete <name>               delete a layout
           blackout <zone> | blackout off     toggle a black panel over a zone
-          edit [close]                       open the visual layout editor
+          edit [name|new|close]              edit a layout (active by default) or create one
           zones                              flash the zone overlay
           reset                              release all windows and blackouts
           startup [on|off]                   run ZoneEnforcer when Windows starts
