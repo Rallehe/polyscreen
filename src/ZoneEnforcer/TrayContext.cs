@@ -39,6 +39,8 @@ public class TrayContext : ApplicationContext
     private readonly PipeServer _pipe;
     private readonly Dictionary<string, BlackoutForm> _blackouts = new(StringComparer.OrdinalIgnoreCase);
     private readonly QuickZones _quickZones;
+    private readonly List<Form> _zoneOverlays = new();
+    private int _overlayState; // 0 = hidden, 1 = forced zones shown, 2 = quick zones shown
     private LayoutEditorForm? _editor;
 
     public TrayContext()
@@ -57,7 +59,7 @@ public class TrayContext : ApplicationContext
             ContextMenuStrip = new ContextMenuStrip(),
         };
         _tray.ContextMenuStrip.Opening += (_, _) => RebuildMenu();
-        _tray.DoubleClick += (_, _) => OverlayForm.Flash(_engine.Config.ActiveZones);
+        _tray.DoubleClick += (_, _) => CycleZoneOverlay();
 
         _pipe = new PipeServer(_marshal, HandleCommand);
         StartupManager.HealPathIfStale();
@@ -80,15 +82,52 @@ public class TrayContext : ApplicationContext
     private void ResetAll()
     {
         CloseAllBlackouts();
+        CloseZoneOverlays();
         _engine.ReleaseAll();
         _editor?.Close();
+    }
+
+    private void CloseZoneOverlays()
+    {
+        foreach (var f in _zoneOverlays) f.Close();
+        _zoneOverlays.Clear();
+        _overlayState = 0;
+    }
+
+    /// <summary>Ctrl+Alt+Z: forced zones → quick zones → hidden; disabled features are skipped.</summary>
+    private string CycleZoneOverlay()
+    {
+        var cfg = _engine.Config;
+        int next = _overlayState;
+        do
+        {
+            next = (next + 1) % 3;
+        } while ((next == 1 && !cfg.ForcedZonesEnabled) || (next == 2 && !cfg.QuickZonesEnabled));
+
+        foreach (var f in _zoneOverlays) f.Close();
+        _zoneOverlays.Clear();
+        _overlayState = next;
+
+        switch (next)
+        {
+            case 1:
+                _zoneOverlays.AddRange(OverlayForm.ShowPersistent(cfg.ActiveZones,
+                    $"Forced Zones — {cfg.ActiveLayout}"));
+                return $"showing forced zones ({cfg.ActiveLayout})";
+            case 2:
+                _zoneOverlays.AddRange(OverlayForm.ShowPersistent(cfg.QuickZones,
+                    $"Quick Zones — {cfg.QuickZonesLayout}"));
+                return $"showing quick zones ({cfg.QuickZonesLayout})";
+            default:
+                return "zone overlays hidden";
+        }
     }
 
     private void OnHotkey(int id)
     {
         if (id == HotkeyZonesId)
         {
-            OverlayForm.Flash(_engine.Config.ActiveZones);
+            CycleZoneOverlay();
             return;
         }
 
@@ -114,6 +153,12 @@ public class TrayContext : ApplicationContext
         {
             if (_engine.Release(hwnd))
                 Notify($"Released: {Native.GetWindowTitle(hwnd)}");
+            return;
+        }
+
+        if (!_engine.Config.ForcedZonesEnabled)
+        {
+            Notify("Forced Zones is disabled (enable it in the tray menu)");
             return;
         }
 
@@ -156,6 +201,7 @@ public class TrayContext : ApplicationContext
             return;
         }
         CloseAllBlackouts();
+        CloseZoneOverlays();
         var screen = Screen.PrimaryScreen!.Bounds;
         LayoutDef? def = null;
         if (layoutName != null) _engine.Config.Layouts.TryGetValue(layoutName, out def);
@@ -186,15 +232,28 @@ public class TrayContext : ApplicationContext
         var menu = _tray.ContextMenuStrip!;
         menu.Items.Clear();
 
-        menu.Items.Add(new ToolStripMenuItem("Show zones  (Ctrl+Alt+Z)", null,
-            (_, _) => OverlayForm.Flash(_engine.Config.ActiveZones)));
+        menu.Items.Add(new ToolStripMenuItem("Show zones  (Ctrl+Alt+Z cycles)", null,
+            (_, _) => CycleZoneOverlay()));
 
         var layoutMenu = new ToolStripMenuItem("Forced Zones");
+        layoutMenu.DropDownItems.Add(new ToolStripMenuItem("Enabled", null, (_, _) =>
+        {
+            var cfg = _engine.Config;
+            cfg.ForcedZonesEnabled = !cfg.ForcedZonesEnabled;
+            if (!cfg.ForcedZonesEnabled) _engine.ReleaseAll();
+            cfg.Save();
+            CloseZoneOverlays();
+        })
+        {
+            Checked = _engine.Config.ForcedZonesEnabled,
+        });
+        layoutMenu.DropDownItems.Add(new ToolStripSeparator());
         foreach (var name in _engine.Config.Layouts.Keys)
         {
             var item = new ToolStripMenuItem(name, null, (_, _) =>
             {
                 CloseAllBlackouts();
+                CloseZoneOverlays();
                 _engine.SetLayout(name);
             })
             {
@@ -209,6 +268,7 @@ public class TrayContext : ApplicationContext
         {
             _engine.Config.QuickZonesEnabled = !_engine.Config.QuickZonesEnabled;
             _engine.Config.Save();
+            CloseZoneOverlays();
         })
         {
             Checked = _engine.Config.QuickZonesEnabled,
@@ -295,6 +355,7 @@ public class TrayContext : ApplicationContext
         menu.Items.Add(new ToolStripMenuItem("Reload config", null, (_, _) =>
         {
             CloseAllBlackouts();
+            CloseZoneOverlays();
             _engine.ReloadConfig();
         }));
         menu.Items.Add(new ToolStripMenuItem("Open config file", null, (_, _) =>
@@ -324,6 +385,8 @@ public class TrayContext : ApplicationContext
             case "assign":
             {
                 if (args.Length < 3) return "usage: assign <zone> <process-or-title>";
+                if (!_engine.Config.ForcedZonesEnabled)
+                    return "forced zones are disabled (enable with: forcedzones on)";
                 var zone = _engine.Config.FindZone(args[1]);
                 if (zone == null)
                     return $"unknown zone '{args[1]}'. zones: {string.Join(", ", _engine.Config.ActiveZones.Select(z => z.Name))}";
@@ -360,9 +423,11 @@ public class TrayContext : ApplicationContext
             case "list":
             {
                 var sb = new StringBuilder();
-                sb.AppendLine($"forced zones layout: {_engine.Config.ActiveLayout}");
+                sb.AppendLine($"forced zones layout: {_engine.Config.ActiveLayout}" +
+                              (_engine.Config.ForcedZonesEnabled ? "" : " (disabled)"));
                 foreach (var z in _engine.Config.ActiveZones) sb.AppendLine($"  zone {z}");
-                sb.AppendLine($"quick zones layout: {_engine.Config.QuickZonesLayout}");
+                sb.AppendLine($"quick zones layout: {_engine.Config.QuickZonesLayout}" +
+                              (_engine.Config.QuickZonesEnabled ? "" : " (disabled)"));
                 sb.AppendLine($"assigned: {_engine.Assignments.Count}");
                 foreach (var a in _engine.Assignments.Values)
                 {
@@ -395,6 +460,7 @@ public class TrayContext : ApplicationContext
                 }
                 if (!_engine.Config.Layouts.ContainsKey(args[1])) return $"unknown layout '{args[1]}'";
                 CloseAllBlackouts();
+                CloseZoneOverlays();
                 _engine.SetLayout(args[1]);
                 return $"layout -> {args[1]}";
             }
@@ -435,8 +501,28 @@ public class TrayContext : ApplicationContext
                 return $"layout editor opened for '{target}' (Enter saves, Esc cancels)";
             }
             case "zones":
-                OverlayForm.Flash(_engine.Config.ActiveZones);
-                return string.Join(Environment.NewLine, _engine.Config.ActiveZones.Select(z => z.ToString()));
+                return CycleZoneOverlay();
+            case "forcedzones":
+            {
+                if (args.Length < 2)
+                    return $"forced zones: {(_engine.Config.ForcedZonesEnabled ? "on" : "off")}, " +
+                           $"layout: {_engine.Config.ActiveLayout} (usage: forcedzones on|off)";
+                if (args[1].Equals("on", StringComparison.OrdinalIgnoreCase))
+                {
+                    _engine.Config.ForcedZonesEnabled = true;
+                    _engine.Config.Save();
+                    return "forced zones: on";
+                }
+                if (args[1].Equals("off", StringComparison.OrdinalIgnoreCase))
+                {
+                    _engine.Config.ForcedZonesEnabled = false;
+                    _engine.ReleaseAll();
+                    _engine.Config.Save();
+                    CloseZoneOverlays();
+                    return "forced zones: off (all windows released)";
+                }
+                return "usage: forcedzones on|off";
+            }
             case "quickzones":
             {
                 if (args.Length < 2)
@@ -452,6 +538,7 @@ public class TrayContext : ApplicationContext
                     case "off":
                         _engine.Config.QuickZonesEnabled = false;
                         _engine.Config.Save();
+                        CloseZoneOverlays();
                         return "quick zones: off";
                     case "layout":
                     {
@@ -508,6 +595,7 @@ public class TrayContext : ApplicationContext
             }
             case "reload":
                 CloseAllBlackouts();
+                CloseZoneOverlays();
                 _engine.ReloadConfig();
                 return $"config reloaded from {Config.ConfigPath}";
             case "quit":
@@ -527,10 +615,11 @@ public class TrayContext : ApplicationContext
           layout delete <name>               delete a layout
           blackout <zone> | blackout off     toggle a black panel over a zone
           edit [name|new|close]              edit a layout (active by default) or create one
-          zones                              flash the zone overlay
+          zones                              cycle overlays: forced -> quick -> hidden
           reset                              release all windows and blackouts
           startup [on|off]                   run ZoneEnforcer when Windows starts
           ontop [on|off]                     focused clamped window covers the taskbar
+          forcedzones on|off                 clamping windows to zones (off releases all)
           quickzones on|off|layout <name>    Shift+drag snapping and its own layout
           reload                             reload config.json
           quit                               exit ZoneEnforcer
@@ -543,6 +632,7 @@ public class TrayContext : ApplicationContext
     {
         _tray.Visible = false;
         CloseAllBlackouts();
+        CloseZoneOverlays();
         _editor?.Close();
         _quickZones.Dispose();
         _pipe.Dispose();

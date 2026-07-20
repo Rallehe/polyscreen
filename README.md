@@ -34,7 +34,7 @@ instance (see CLI below).
 |---|---|
 | `Ctrl+Alt+1..9` | Assign the focused window to zone 1..9 of the active layout |
 | `Ctrl+Alt+0` | Release the focused window (restores border and position) |
-| `Ctrl+Alt+Z` | Flash the zone overlay (also: double-click the tray icon) |
+| `Ctrl+Alt+Z` | Cycle zone overlays: Forced Zones → Quick Zones → hidden (disabled features are skipped; also: double-click the tray icon) |
 | `Ctrl+Alt+B` | Black out / restore the zone under the mouse cursor |
 | `Ctrl+Alt+Esc` | Panic reset: release all windows, restore all blackouts |
 
@@ -51,7 +51,8 @@ ZoneEnforcer.exe layout thirds           # switch layout; bare "layout" lists th
 ZoneEnforcer.exe layout delete thirds    # delete a layout (also in the tray's Delete layout menu)
 ZoneEnforcer.exe blackout left           # toggle a black panel over a zone ("blackout off" restores all)
 ZoneEnforcer.exe edit Coding             # edit a layout (bare "edit" = active, "edit new" = create)
-ZoneEnforcer.exe zones                   # flash the overlay
+ZoneEnforcer.exe zones                   # cycle overlays: forced -> quick -> hidden
+ZoneEnforcer.exe forcedzones off         # disable clamping and release all windows
 ZoneEnforcer.exe reset                   # release all windows and blackouts
 ZoneEnforcer.exe startup on              # run when Windows starts (also in the tray menu)
 ZoneEnforcer.exe ontop off               # focused window no longer covers the taskbar (default: on)
