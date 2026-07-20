@@ -15,6 +15,7 @@ public class QuickZones : IDisposable
     private bool _isResize;
     private bool _shiftSeen; // Shift state at the last poll — the drop handler runs async,
                              // so a fresh key read can miss a Shift released right after the button
+    private readonly HashSet<IntPtr> _squared = new(); // windows whose corners we un-rounded
 
     public QuickZones(Engine engine)
     {
@@ -75,10 +76,17 @@ public class QuickZones : IDisposable
             {
                 if (Native.IsZoomed(hwnd)) Native.ShowWindow(hwnd, Native.SW_RESTORE);
 
+                // Snapped windows are normal windows (not topmost), so keep them out from
+                // under the taskbar by clipping the zone to the monitor's work area.
+                var target = Rectangle.Intersect(
+                    new Rectangle(zone.X, zone.Y, zone.Width, zone.Height),
+                    Screen.FromPoint(new Point(pt.X, pt.Y)).WorkingArea);
+                if (target.IsEmpty) target = new Rectangle(zone.X, zone.Y, zone.Width, zone.Height);
+
                 // The window rect extends past the visible frame by the invisible resize
                 // borders; oversize the target by that margin so the visible window fills
                 // the zone edge-to-edge instead of leaving a ~7px gap on each side.
-                int x = zone.X, y = zone.Y, w = zone.Width, h = zone.Height;
+                int x = target.X, y = target.Y, w = target.Width, h = target.Height;
                 if (Native.GetWindowRect(hwnd, out var wr) &&
                     Native.DwmGetWindowAttribute(hwnd, Native.DWMWA_EXTENDED_FRAME_BOUNDS,
                         out var fb, System.Runtime.InteropServices.Marshal.SizeOf<RECT>()) == 0)
@@ -92,12 +100,35 @@ public class QuickZones : IDisposable
                     }
                 }
 
+                SetCorners(hwnd, round: false);
+                _squared.Add(hwnd);
                 Native.SetWindowPos(hwnd, IntPtr.Zero, x, y, w, h,
                     Native.SWP_NOZORDER | Native.SWP_NOACTIVATE);
                 Log.Write($"quick-snap {hwnd} \"{Native.GetWindowTitle(hwnd)}\" -> {zone}");
             }
+            else
+            {
+                RestoreCornersIfSquared(hwnd);
+            }
+        }
+        else if (hwnd == _dragHwnd && !_isResize)
+        {
+            // Dragged away without snapping: give the window its rounded corners back.
+            RestoreCornersIfSquared(hwnd);
         }
         Cancel();
+    }
+
+    private static void SetCorners(IntPtr hwnd, bool round)
+    {
+        int pref = round ? Native.DWMWCP_DEFAULT : Native.DWMWCP_DONOTROUND;
+        Native.DwmSetWindowAttribute(hwnd, Native.DWMWA_WINDOW_CORNER_PREFERENCE, ref pref, sizeof(int));
+    }
+
+    private void RestoreCornersIfSquared(IntPtr hwnd)
+    {
+        if (_squared.Remove(hwnd) && Native.IsWindow(hwnd))
+            SetCorners(hwnd, round: true);
     }
 
     private void HideOverlay()
@@ -119,5 +150,6 @@ public class QuickZones : IDisposable
         _engine.MoveSizeEnd -= OnEnd;
         Cancel();
         _timer.Dispose();
+        foreach (var hwnd in _squared.ToList()) RestoreCornersIfSquared(hwnd);
     }
 }
