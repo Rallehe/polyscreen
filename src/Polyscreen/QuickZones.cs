@@ -1,8 +1,8 @@
-namespace ZoneEnforcer;
+﻿namespace Polyscreen;
 
 /// <summary>
 /// FancyZones-style drag snapping: hold Shift while dragging a window and drop
-/// it into a zone of the Quick Zones layout. A one-time move — the window keeps
+/// it into a zone of the Quick Zones layout. A one-time move â€” the window keeps
 /// its border and is not clamped, so it never interferes with enforced windows.
 /// </summary>
 public class QuickZones : IDisposable
@@ -13,7 +13,7 @@ public class QuickZones : IDisposable
     private IntPtr _dragHwnd;
     private RECT _startRect;
     private bool _isResize;
-    private bool _shiftSeen; // Shift state at the last poll — the drop handler runs async,
+    private bool _shiftSeen; // Shift state at the last poll â€” the drop handler runs async,
                              // so a fresh key read can miss a Shift released right after the button
     private readonly HashSet<IntPtr> _squared = new(); // windows whose corners we un-rounded
 

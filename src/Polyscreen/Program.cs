@@ -1,6 +1,6 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
-namespace ZoneEnforcer;
+namespace Polyscreen;
 
 internal static class Program
 {
@@ -17,15 +17,15 @@ internal static class Program
             AttachConsole(AttachParentProcess);
             var response = PipeServer.SendCommand(args, out var error);
             Console.WriteLine();
-            Console.WriteLine(response ?? $"ZoneEnforcer did not answer: {error}");
+            Console.WriteLine(response ?? $"Polyscreen did not answer: {error}");
             return response == null ? 1 : 0;
         }
 
-        using var mutex = new Mutex(true, "ZoneEnforcer_SingleInstance", out bool isNew);
+        using var mutex = new Mutex(true, "Polyscreen_SingleInstance", out bool isNew);
         if (!isNew)
         {
-            MessageBox.Show("ZoneEnforcer is already running (check the system tray).",
-                "ZoneEnforcer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("Polyscreen is already running (check the system tray).",
+                "Polyscreen", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return 0;
         }
 

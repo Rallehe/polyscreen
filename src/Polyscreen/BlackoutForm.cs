@@ -1,7 +1,7 @@
-namespace ZoneEnforcer;
+﻿namespace Polyscreen;
 
 /// <summary>
-/// Pure-black topmost panel covering one zone — on an OLED the pixels are
+/// Pure-black topmost panel covering one zone â€” on an OLED the pixels are
 /// simply off. Never takes focus; double-click it to restore the zone.
 /// </summary>
 public class BlackoutForm : Form
@@ -38,7 +38,7 @@ public class BlackoutForm : Form
             ForeColor = Color.FromArgb(70, 70, 70),
             BackColor = Color.Black,
             Font = new Font("Segoe UI", 14),
-            Text = "zone blacked out — double-click to restore",
+            Text = "zone blacked out â€” double-click to restore",
         };
         hint.DoubleClick += (_, _) => Close();
         Controls.Add(hint);

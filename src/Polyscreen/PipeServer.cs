@@ -1,18 +1,18 @@
-using System.IO.Pipes;
+﻿using System.IO.Pipes;
 using System.Text;
 
-namespace ZoneEnforcer;
+namespace Polyscreen;
 
 /// <summary>
 /// Named-pipe command interface so the exe doubles as a CLI:
-///   ZoneEnforcer.exe assign left notepad
-///   ZoneEnforcer.exe release notepad | release all
-///   ZoneEnforcer.exe list | layout halves | reload | quit
+///   Polyscreen.exe assign left notepad
+///   Polyscreen.exe release notepad | release all
+///   Polyscreen.exe list | layout halves | reload | quit
 /// One request line per connection, response text back, then close.
 /// </summary>
 public class PipeServer : IDisposable
 {
-    public const string PipeName = "ZoneEnforcerPipe";
+    public const string PipeName = "PolyscreenPipe";
     private static readonly UTF8Encoding Utf8NoBom = new(false);
 
     private readonly Control _marshal;
@@ -23,7 +23,7 @@ public class PipeServer : IDisposable
     {
         _marshal = marshal;
         _handler = handler;
-        new Thread(ListenLoop) { IsBackground = true, Name = "ZoneEnforcerPipe" }.Start();
+        new Thread(ListenLoop) { IsBackground = true, Name = "PolyscreenPipe" }.Start();
     }
 
     private void ListenLoop()

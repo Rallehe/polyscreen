@@ -1,4 +1,4 @@
-namespace ZoneEnforcer;
+﻿namespace Polyscreen;
 
 /// <summary>Translucent flash showing where the zones of the active layout sit.</summary>
 public class OverlayForm : Form

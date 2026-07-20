@@ -1,6 +1,6 @@
-using System.Text;
+﻿using System.Text;
 
-namespace ZoneEnforcer;
+namespace Polyscreen;
 
 /// <summary>Hidden window that owns the global hotkeys and serves as the UI-thread invoke target.</summary>
 public class MarshalForm : Form
@@ -54,7 +54,7 @@ public class TrayContext : ApplicationContext
         _tray = new NotifyIcon
         {
             Icon = SystemIcons.Application,
-            Text = "ZoneEnforcer",
+            Text = "Polyscreen",
             Visible = true,
             ContextMenuStrip = new ContextMenuStrip(),
         };
@@ -95,7 +95,7 @@ public class TrayContext : ApplicationContext
         _overlayState = 0;
     }
 
-    /// <summary>Ctrl+Alt+Z: forced zones → quick zones → hidden; disabled features are skipped.</summary>
+    /// <summary>Ctrl+Alt+Z: forced zones â†’ quick zones â†’ hidden; disabled features are skipped.</summary>
     private string CycleZoneOverlay()
     {
         var cfg = _engine.Config;
@@ -113,11 +113,11 @@ public class TrayContext : ApplicationContext
         {
             case 1:
                 _zoneOverlays.AddRange(OverlayForm.ShowPersistent(cfg.ActiveZones,
-                    $"Forced Zones — {cfg.ActiveLayout}"));
+                    $"Forced Zones â€” {cfg.ActiveLayout}"));
                 return $"showing forced zones ({cfg.ActiveLayout})";
             case 2:
                 _zoneOverlays.AddRange(OverlayForm.ShowPersistent(cfg.QuickZones,
-                    $"Quick Zones — {cfg.QuickZonesLayout}"));
+                    $"Quick Zones â€” {cfg.QuickZonesLayout}"));
                 return $"showing quick zones ({cfg.QuickZonesLayout})";
             default:
                 return "zone overlays hidden";
@@ -171,7 +171,7 @@ public class TrayContext : ApplicationContext
         }
         var zone = zones[id - 1];
         if (_engine.Assign(hwnd, zone))
-            Notify($"{Native.GetWindowTitle(hwnd)} → {zone.Name}");
+            Notify($"{Native.GetWindowTitle(hwnd)} â†’ {zone.Name}");
     }
 
     private void ToggleBlackout(Zone zone)
@@ -223,13 +223,13 @@ public class TrayContext : ApplicationContext
 
     private void Notify(string text)
     {
-        _tray.BalloonTipTitle = "ZoneEnforcer";
+        _tray.BalloonTipTitle = "Polyscreen";
         _tray.BalloonTipText = text;
         _tray.ShowBalloonTip(1500);
     }
 
     /// <summary>
-    /// Clicking a toggle shouldn't dismiss the menu — so item clicks never auto-close it.
+    /// Clicking a toggle shouldn't dismiss the menu â€” so item clicks never auto-close it.
     /// Actions that open something else (editor, config, exit) call CloseMenu explicitly,
     /// and clicking outside or pressing Esc still closes normally.
     /// </summary>
@@ -314,7 +314,7 @@ public class TrayContext : ApplicationContext
         }
         menu.Items.Add(qzMenu);
 
-        menu.Items.Add(new ToolStripMenuItem("Create layout…", null, (_, _) =>
+        menu.Items.Add(new ToolStripMenuItem("Create layoutâ€¦", null, (_, _) =>
         {
             CloseMenu();
             OpenEditor(null);
@@ -338,7 +338,7 @@ public class TrayContext : ApplicationContext
             deleteMenu.DropDownItems.Add(new ToolStripMenuItem(name, null, (_, _) =>
             {
                 CloseMenu();
-                if (MessageBox.Show($"Delete layout '{name}'?", "ZoneEnforcer",
+                if (MessageBox.Show($"Delete layout '{name}'?", "Polyscreen",
                         MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
                 bool wasActive = name.Equals(_engine.Config.ActiveLayout, StringComparison.OrdinalIgnoreCase);
                 if (wasActive) CloseAllBlackouts();
@@ -378,9 +378,9 @@ public class TrayContext : ApplicationContext
         foreach (var a in _engine.Assignments.Values)
         {
             var title = Native.GetWindowTitle(a.Hwnd);
-            if (title.Length > 40) title = title[..40] + "…";
+            if (title.Length > 40) title = title[..40] + "â€¦";
             var hwnd = a.Hwnd;
-            var item = new ToolStripMenuItem($"{title}  [{a.Zone.Name}]  — click to release");
+            var item = new ToolStripMenuItem($"{title}  [{a.Zone.Name}]  â€” click to release");
             item.Click += (_, _) =>
             {
                 if (_engine.Release(hwnd))
@@ -393,7 +393,7 @@ public class TrayContext : ApplicationContext
         }
         if (assigned.DropDownItems.Count == 0)
         {
-            assigned.DropDownItems.Add(new ToolStripMenuItem("(none — focus a window, press Ctrl+Alt+1..9)")
+            assigned.DropDownItems.Add(new ToolStripMenuItem("(none â€” focus a window, press Ctrl+Alt+1..9)")
             {
                 Enabled = false,
             });
@@ -670,7 +670,7 @@ public class TrayContext : ApplicationContext
     }
 
     private static string HelpText() => """
-        ZoneEnforcer commands:
+        Polyscreen commands:
           assign <zone> <process-or-title>   clamp a window into a zone
           release <process-or-title> | all   restore a window
           list                               show zones and assigned windows
@@ -680,12 +680,12 @@ public class TrayContext : ApplicationContext
           edit [name|new|close]              edit a layout (active by default) or create one
           zones                              cycle overlays: forced -> quick -> hidden
           reset                              release all windows and blackouts
-          startup [on|off]                   run ZoneEnforcer when Windows starts
+          startup [on|off]                   run Polyscreen when Windows starts
           ontop [on|off]                     focused clamped window covers the taskbar
           forcedzones on|off                 clamping windows to zones (off releases all)
           quickzones on|off|layout <name>    Shift+drag snapping and its own layout
           reload                             reload config.json
-          quit                               exit ZoneEnforcer
+          quit                               exit Polyscreen
         Hotkeys: Ctrl+Alt+1..9 assign focused window, Ctrl+Alt+0 release,
                  Ctrl+Alt+Z show zones, Ctrl+Alt+B black out zone under cursor,
                  Ctrl+Alt+Esc release everything.

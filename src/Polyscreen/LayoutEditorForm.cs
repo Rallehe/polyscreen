@@ -1,4 +1,4 @@
-namespace ZoneEnforcer;
+﻿namespace Polyscreen;
 
 /// <summary>
 /// Fullscreen visual layout editor (FancyZones-style). Click a zone to split it
@@ -61,7 +61,7 @@ public class LayoutEditorForm : Form
     private Rectangle WorkRect => new(_workArea.X - _screen.X, _workArea.Y - _screen.Y,
         _workArea.Width, _workArea.Height);
 
-    /// <summary>The space zones are designed against — full screen or the taskbar-free work area.</summary>
+    /// <summary>The space zones are designed against â€” full screen or the taskbar-free work area.</summary>
     private Rectangle RootRect => _overTaskbar ? FullRect : WorkRect;
 
     // ---- tree layout ----
@@ -348,7 +348,7 @@ public class LayoutEditorForm : Form
             g.DrawRectangle(pen, Rectangle.Inflate(r, -1, -1));
 
             string label = $"{i + 1}";
-            string info = $"{n.Name ?? "new zone"}\n{r.Width} × {r.Height}";
+            string info = $"{n.Name ?? "new zone"}\n{r.Width} Ã— {r.Height}";
             var mid = new RectangleF(r.X, r.Y, r.Width, r.Height);
             using var white = new SolidBrush(Color.FromArgb(235, 235, 235));
             using var gray = new SolidBrush(Color.FromArgb(160, 160, 160));
@@ -375,7 +375,7 @@ public class LayoutEditorForm : Form
             {
                 g.FillRectangle(tbBrush, s);
                 if (s.Width >= 260 && s.Height >= 16)
-                    g.DrawString("taskbar — zones stop here (T places them over it)", tbFont, tbText, s, center);
+                    g.DrawString("taskbar â€” zones stop here (T places them over it)", tbFont, tbText, s, center);
             }
         }
 

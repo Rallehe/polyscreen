@@ -1,4 +1,4 @@
-namespace ZoneEnforcer;
+﻿namespace Polyscreen;
 
 public record WindowInfo(IntPtr Hwnd, string Title, string Process);
 

@@ -1,7 +1,7 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using System.Text;
 
-namespace ZoneEnforcer;
+namespace Polyscreen;
 
 [StructLayout(LayoutKind.Sequential)]
 public struct RECT
