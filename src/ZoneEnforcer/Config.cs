@@ -33,6 +33,17 @@ public class Config
     /// <summary>Focused clamped windows go always-on-top so they cover the taskbar.</summary>
     public bool TopmostOnFocus { get; set; } = true;
 
+    /// <summary>Quick Zones: Shift+drag a window to snap it into a zone (one-time, no clamping).</summary>
+    public bool QuickZonesEnabled { get; set; } = true;
+
+    /// <summary>Layout Quick Zones uses; null/missing means "follow the enforcer's active layout".</summary>
+    public string? QuickZonesLayout { get; set; }
+
+    [JsonIgnore]
+    public List<Zone> QuickZones =>
+        QuickZonesLayout != null && Layouts.TryGetValue(QuickZonesLayout, out var zones)
+            ? zones : ActiveZones;
+
     [JsonIgnore]
     public List<Zone> ActiveZones =>
         Layouts.TryGetValue(ActiveLayout, out var zones) ? zones : new List<Zone>();

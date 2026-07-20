@@ -21,6 +21,8 @@ public static class Native
 
     // WinEvent constants
     public const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
+    public const uint EVENT_SYSTEM_MOVESIZESTART = 0x000A;
+    public const uint EVENT_SYSTEM_MOVESIZEEND = 0x000B;
     public const uint EVENT_OBJECT_DESTROY = 0x8001;
     public const uint EVENT_OBJECT_SHOW = 0x8002;
     public const uint EVENT_OBJECT_LOCATIONCHANGE = 0x800B;
@@ -37,6 +39,12 @@ public static class Native
     public const long WS_MAXIMIZEBOX = 0x00010000L;
     public const long WS_EX_TOOLWINDOW = 0x00000080L;
     public const long WS_EX_NOACTIVATE = 0x08000000L;
+    public const long WS_EX_TRANSPARENT = 0x00000020L;
+
+    public const int VK_SHIFT = 0x10;
+
+    [DllImport("user32.dll")]
+    public static extern short GetAsyncKeyState(int vKey);
 
     // SetWindowPos flags
     public static readonly IntPtr HWND_TOP = IntPtr.Zero;
