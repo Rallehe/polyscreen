@@ -141,6 +141,12 @@ public class LayoutEditorForm : Form
         base.OnMouseDown(e);
         if (e.Button == MouseButtons.Left)
         {
+            if ((ModifierKeys & Keys.Control) != 0)
+            {
+                var target = HitLeaf(e.Location);
+                if (target != null) RenameZone(target.Value.n);
+                return;
+            }
             var divider = HitDivider(e.Location);
             if (divider != null)
             {
@@ -172,6 +178,14 @@ public class LayoutEditorForm : Form
         leaf.Vertical = !horizontal;
         leaf.Ratio = (double)px / span;
         leaf.Name = null;
+        Invalidate();
+    }
+
+    private void RenameZone(Node leaf)
+    {
+        using var prompt = new NamePrompt("Rename zone", "Zone name:", leaf.Name ?? "");
+        if (prompt.ShowDialog(this) != DialogResult.OK) return;
+        leaf.Name = prompt.Value.Length == 0 ? null : prompt.Value;
         Invalidate();
     }
 
@@ -237,7 +251,7 @@ public class LayoutEditorForm : Form
 
     private void SaveAndClose()
     {
-        using var prompt = new NamePrompt(_layoutName);
+        using var prompt = new NamePrompt("Save layout", "Layout name (existing name overwrites):", _layoutName);
         if (prompt.ShowDialog(this) != DialogResult.OK || prompt.Value.Length == 0) return;
 
         var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -365,9 +379,9 @@ public class LayoutEditorForm : Form
             }
         }
 
-        string help = "Click: split   Shift+Click: split horizontally   Right-click: remove   " +
-                      $"Drag borders: resize   T: over taskbar {(_overTaskbar ? "ON" : "OFF")}   " +
-                      "Enter: save   Esc: cancel";
+        string help = "Click: split   Shift+Click: split horizontally   Ctrl+Click: rename   " +
+                      "Right-click: remove   Drag borders: resize   " +
+                      $"T: over taskbar {(_overTaskbar ? "ON" : "OFF")}   Enter: save   Esc: cancel";
         using var barBrush = new SolidBrush(Color.FromArgb(200, 12, 12, 14));
         using var helpBrush = new SolidBrush(Color.FromArgb(220, 220, 220));
         using var helpFont = new Font("Segoe UI", 12);
@@ -381,9 +395,9 @@ public class LayoutEditorForm : Form
         private readonly TextBox _box = new();
         public string Value => _box.Text.Trim();
 
-        public NamePrompt(string initial)
+        public NamePrompt(string title, string labelText, string initial)
         {
-            Text = "Save layout";
+            Text = title;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent;
             ClientSize = new Size(320, 106);
@@ -391,7 +405,7 @@ public class LayoutEditorForm : Form
             ShowInTaskbar = false;
             TopMost = true;
 
-            var label = new Label { Text = "Layout name (existing name overwrites):", Left = 12, Top = 10, AutoSize = true };
+            var label = new Label { Text = labelText, Left = 12, Top = 10, AutoSize = true };
             _box.SetBounds(12, 32, 296, 24);
             _box.Text = initial;
             _box.SelectAll();
