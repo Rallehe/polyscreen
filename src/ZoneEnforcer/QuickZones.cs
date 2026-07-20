@@ -74,7 +74,25 @@ public class QuickZones : IDisposable
             if (zone != null)
             {
                 if (Native.IsZoomed(hwnd)) Native.ShowWindow(hwnd, Native.SW_RESTORE);
-                Native.SetWindowPos(hwnd, IntPtr.Zero, zone.X, zone.Y, zone.Width, zone.Height,
+
+                // The window rect extends past the visible frame by the invisible resize
+                // borders; oversize the target by that margin so the visible window fills
+                // the zone edge-to-edge instead of leaving a ~7px gap on each side.
+                int x = zone.X, y = zone.Y, w = zone.Width, h = zone.Height;
+                if (Native.GetWindowRect(hwnd, out var wr) &&
+                    Native.DwmGetWindowAttribute(hwnd, Native.DWMWA_EXTENDED_FRAME_BOUNDS,
+                        out var fb, System.Runtime.InteropServices.Marshal.SizeOf<RECT>()) == 0)
+                {
+                    int left = fb.Left - wr.Left, top = fb.Top - wr.Top;
+                    int right = wr.Right - fb.Right, bottom = wr.Bottom - fb.Bottom;
+                    if (left is >= 0 and < 32 && top is >= 0 and < 32 &&
+                        right is >= 0 and < 32 && bottom is >= 0 and < 32)
+                    {
+                        x -= left; y -= top; w += left + right; h += top + bottom;
+                    }
+                }
+
+                Native.SetWindowPos(hwnd, IntPtr.Zero, x, y, w, h,
                     Native.SWP_NOZORDER | Native.SWP_NOACTIVATE);
                 Log.Write($"quick-snap {hwnd} \"{Native.GetWindowTitle(hwnd)}\" -> {zone}");
             }
