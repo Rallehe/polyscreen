@@ -34,7 +34,7 @@ instance (see CLI below).
 |---|---|
 | `Ctrl+Alt+1..9` | Assign the focused window to zone 1..9 of the active layout |
 | `Ctrl+Alt+0` | Release the focused window (restores border and position) |
-| `Ctrl+Alt+Z` | Flash the zone overlay (also: double-click the tray icon) |
+| `Ctrl+Alt+Z` | Cycle zone overlays: Forced Zones → Quick Zones → hidden (disabled features are skipped; also: double-click the tray icon) |
 | `Ctrl+Alt+B` | Black out / restore the zone under the mouse cursor |
 | `Ctrl+Alt+Esc` | Panic reset: release all windows, restore all blackouts |
 
@@ -51,7 +51,8 @@ ZoneEnforcer.exe layout thirds           # switch layout; bare "layout" lists th
 ZoneEnforcer.exe layout delete thirds    # delete a layout (also in the tray's Delete layout menu)
 ZoneEnforcer.exe blackout left           # toggle a black panel over a zone ("blackout off" restores all)
 ZoneEnforcer.exe edit Coding             # edit a layout (bare "edit" = active, "edit new" = create)
-ZoneEnforcer.exe zones                   # flash the overlay
+ZoneEnforcer.exe zones                   # cycle overlays: forced -> quick -> hidden
+ZoneEnforcer.exe forcedzones off         # disable clamping and release all windows
 ZoneEnforcer.exe reset                   # release all windows and blackouts
 ZoneEnforcer.exe startup on              # run when Windows starts (also in the tray menu)
 ZoneEnforcer.exe ontop off               # focused window no longer covers the taskbar (default: on)
@@ -82,10 +83,12 @@ horizontally, **drag** a shared border to resize (snaps to halves, thirds, and q
 in a binary split tree, so the layout always tiles the screen exactly. Saving with an existing
 layout name overwrites it; a new name creates a new layout and switches to it.
 
-The save dialog has an **"Over taskbar"** checkbox, stored per layout: when checked, Quick Zones
-snaps windows across the full zone (extending behind the taskbar); when unchecked (default),
-snapped windows are clipped to the work area so they stop at the taskbar's edge. Enforced windows
-always use the full zone regardless — they cover the taskbar while focused.
+Press **T** in the editor to toggle **"Over taskbar"**, stored per layout. With it off (default)
+the design canvas is the taskbar-free work area — the taskbar strip is hatched out — so zone
+sizes are exact: split a 1392px-tall work area into four rows and every row is truly 348px, with
+no hidden clipping later. With it on, zones are designed against the full screen and extend
+behind the taskbar. Zones keep their proportions when toggling, and every zone label shows the
+real size a window will get.
 
 ## Blacking out a zone
 

@@ -77,6 +77,9 @@ public class Config
     /// <summary>Focused clamped windows go always-on-top so they cover the taskbar.</summary>
     public bool TopmostOnFocus { get; set; } = true;
 
+    /// <summary>Forced Zones: assign windows to zones and keep them clamped there.</summary>
+    public bool ForcedZonesEnabled { get; set; } = true;
+
     /// <summary>Quick Zones: Shift+drag a window to snap it into a zone (one-time, no clamping).</summary>
     public bool QuickZonesEnabled { get; set; } = true;
 

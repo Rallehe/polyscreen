@@ -103,6 +103,7 @@ public class Engine : IDisposable
 
     public bool Assign(IntPtr hwnd, Zone zone)
     {
+        if (!Config.ForcedZonesEnabled) return false;
         if (hwnd == IntPtr.Zero || !Native.IsWindow(hwnd)) return false;
         if (IsShellWindow(hwnd)) return false;
 
@@ -237,6 +238,7 @@ public class Engine : IDisposable
 
     private void TryAutoAssign(IntPtr hwnd)
     {
+        if (!Config.ForcedZonesEnabled) return;
         if (Config.AutoRules.Count == 0 || _assignments.ContainsKey(hwnd)) return;
         if (!Native.IsWindowVisible(hwnd)) return;
         if (Native.GetWindow(hwnd, Native.GW_OWNER) != IntPtr.Zero) return; // skip owned dialogs

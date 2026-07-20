@@ -24,6 +24,7 @@ public class LayoutEditorForm : Form
     private const int SnapPx = 14;
 
     private readonly Rectangle _screen;
+    private readonly Rectangle _workArea;
     private readonly string _layoutName;
     private readonly Action<string, List<Zone>, bool> _onSave;
     private bool _overTaskbar;
@@ -36,6 +37,7 @@ public class LayoutEditorForm : Form
         bool overTaskbar, Action<string, List<Zone>, bool> onSave)
     {
         _screen = screen;
+        _workArea = Screen.FromRectangle(screen).WorkingArea;
         _layoutName = layoutName;
         _overTaskbar = overTaskbar;
         _onSave = onSave;
@@ -54,7 +56,13 @@ public class LayoutEditorForm : Form
         Cursor = Cursors.Cross;
     }
 
-    private Rectangle RootRect => new(0, 0, _screen.Width, _screen.Height);
+    private Rectangle FullRect => new(0, 0, _screen.Width, _screen.Height);
+
+    private Rectangle WorkRect => new(_workArea.X - _screen.X, _workArea.Y - _screen.Y,
+        _workArea.Width, _workArea.Height);
+
+    /// <summary>The space zones are designed against — full screen or the taskbar-free work area.</summary>
+    private Rectangle RootRect => _overTaskbar ? FullRect : WorkRect;
 
     // ---- tree layout ----
 
@@ -218,13 +226,19 @@ public class LayoutEditorForm : Form
         base.OnKeyDown(e);
         if (e.KeyCode == Keys.Escape) Close();
         else if (e.KeyCode == Keys.Enter) SaveAndClose();
+        else if (e.KeyCode == Keys.T)
+        {
+            // Zones are ratio-based, so they re-map live between the two canvases and
+            // every label shows the real size a window will get.
+            _overTaskbar = !_overTaskbar;
+            Invalidate();
+        }
     }
 
     private void SaveAndClose()
     {
-        using var prompt = new NamePrompt(_layoutName, _overTaskbar);
+        using var prompt = new NamePrompt(_layoutName);
         if (prompt.ShowDialog(this) != DialogResult.OK || prompt.Value.Length == 0) return;
-        _overTaskbar = prompt.OverTaskbar;
 
         var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var zones = new List<Zone>();
@@ -258,7 +272,8 @@ public class LayoutEditorForm : Form
         var items = zones.Select(z => (
             r: new Rectangle(z.X - _screen.X, z.Y - _screen.Y, z.Width, z.Height),
             name: z.Name)).ToList();
-        return Build(items, RootRect);
+        // Older layouts may tile the full screen regardless of their flag; accept either space.
+        return Build(items, RootRect) ?? Build(items, _overTaskbar ? WorkRect : FullRect);
     }
 
     /// <summary>Recursive guillotine-cut recovery; null if the rects don't tile the bounds.</summary>
@@ -327,8 +342,32 @@ public class LayoutEditorForm : Form
             g.DrawString(info, infoFont, gray, new RectangleF(mid.X, mid.Y + 45, mid.Width, mid.Height), center);
         }
 
-        const string help = "Click: split   Shift+Click: split horizontally   Right-click: remove   " +
-                            "Drag borders: resize   Enter: save   Esc: cancel";
+        // Everything outside the design canvas (the taskbar area) is hatched out.
+        if (!_overTaskbar)
+        {
+            using var tbBrush = new SolidBrush(Color.FromArgb(66, 30, 34));
+            using var tbText = new SolidBrush(Color.FromArgb(200, 160, 160));
+            using var tbFont = new Font("Segoe UI", 11);
+            var full = FullRect;
+            var wa = WorkRect;
+            var strips = new List<Rectangle>();
+            if (wa.Top > full.Top) strips.Add(full with { Height = wa.Top - full.Top });
+            if (full.Bottom > wa.Bottom)
+                strips.Add(new Rectangle(full.X, wa.Bottom, full.Width, full.Bottom - wa.Bottom));
+            if (wa.Left > full.Left) strips.Add(new Rectangle(full.X, wa.Y, wa.Left - full.Left, wa.Height));
+            if (full.Right > wa.Right)
+                strips.Add(new Rectangle(wa.Right, wa.Y, full.Right - wa.Right, wa.Height));
+            foreach (var s in strips)
+            {
+                g.FillRectangle(tbBrush, s);
+                if (s.Width >= 260 && s.Height >= 16)
+                    g.DrawString("taskbar — zones stop here (T places them over it)", tbFont, tbText, s, center);
+            }
+        }
+
+        string help = "Click: split   Shift+Click: split horizontally   Right-click: remove   " +
+                      $"Drag borders: resize   T: over taskbar {(_overTaskbar ? "ON" : "OFF")}   " +
+                      "Enter: save   Esc: cancel";
         using var barBrush = new SolidBrush(Color.FromArgb(200, 12, 12, 14));
         using var helpBrush = new SolidBrush(Color.FromArgb(220, 220, 220));
         using var helpFont = new Font("Segoe UI", 12);
@@ -340,16 +379,14 @@ public class LayoutEditorForm : Form
     private sealed class NamePrompt : Form
     {
         private readonly TextBox _box = new();
-        private readonly CheckBox _overTaskbar = new();
         public string Value => _box.Text.Trim();
-        public bool OverTaskbar => _overTaskbar.Checked;
 
-        public NamePrompt(string initial, bool overTaskbar)
+        public NamePrompt(string initial)
         {
             Text = "Save layout";
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(320, 136);
+            ClientSize = new Size(320, 106);
             MinimizeBox = MaximizeBox = false;
             ShowInTaskbar = false;
             TopMost = true;
@@ -358,16 +395,13 @@ public class LayoutEditorForm : Form
             _box.SetBounds(12, 32, 296, 24);
             _box.Text = initial;
             _box.SelectAll();
-            _overTaskbar.Text = "Over taskbar (Quick Zones snap across it)";
-            _overTaskbar.SetBounds(12, 62, 296, 24);
-            _overTaskbar.Checked = overTaskbar;
             var ok = new Button { Text = "Save", DialogResult = DialogResult.OK };
-            ok.SetBounds(152, 98, 75, 28);
+            ok.SetBounds(152, 68, 75, 28);
             var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel };
-            cancel.SetBounds(233, 98, 75, 28);
+            cancel.SetBounds(233, 68, 75, 28);
             AcceptButton = ok;
             CancelButton = cancel;
-            Controls.AddRange(new Control[] { label, _box, _overTaskbar, ok, cancel });
+            Controls.AddRange(new Control[] { label, _box, ok, cancel });
         }
     }
 }
