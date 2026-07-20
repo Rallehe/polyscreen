@@ -78,7 +78,8 @@ The tray menu has "Create layout…" (blank canvas), "Edit layout" (pick one), a
 (pick one, with confirmation); `ZoneEnforcer.exe edit [name|new]` does the same from the CLI.
 The editor is fullscreen and FancyZones-style: **click** a zone to split it vertically at the
 cursor, **Shift+click** to split
-horizontally, **drag** a shared border to resize (snaps to halves, thirds, and quarters),
+horizontally, **Ctrl+click** to rename a zone, **drag** a shared border to resize (snaps to
+halves, thirds, and quarters),
 **right-click** a zone to remove it, **Enter** to save under a name, **Esc** to cancel. Zones live
 in a binary split tree, so the layout always tiles the screen exactly. Saving with an existing
 layout name overwrites it; a new name creates a new layout and switches to it.

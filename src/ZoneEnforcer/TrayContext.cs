@@ -59,6 +59,7 @@ public class TrayContext : ApplicationContext
             ContextMenuStrip = new ContextMenuStrip(),
         };
         _tray.ContextMenuStrip.Opening += (_, _) => RebuildMenu();
+        _tray.ContextMenuStrip.Closing += KeepOpenOnItemClick;
         _tray.DoubleClick += (_, _) => CycleZoneOverlay();
 
         _pipe = new PipeServer(_marshal, HandleCommand);
@@ -227,6 +228,26 @@ public class TrayContext : ApplicationContext
         _tray.ShowBalloonTip(1500);
     }
 
+    /// <summary>
+    /// Clicking a toggle shouldn't dismiss the menu — so item clicks never auto-close it.
+    /// Actions that open something else (editor, config, exit) call CloseMenu explicitly,
+    /// and clicking outside or pressing Esc still closes normally.
+    /// </summary>
+    private static void KeepOpenOnItemClick(object? sender, ToolStripDropDownClosingEventArgs e)
+    {
+        if (e.CloseReason == ToolStripDropDownCloseReason.ItemClicked) e.Cancel = true;
+    }
+
+    private void CloseMenu() => _tray.ContextMenuStrip!.Close(ToolStripDropDownCloseReason.CloseCalled);
+
+    /// <summary>Refresh the radio checkmarks of sibling items sharing a Tag, in place.</summary>
+    private static void RefreshRadio(ToolStripMenuItem parent, string tag, string checkedText)
+    {
+        foreach (ToolStripItem it in parent.DropDownItems)
+            if (it is ToolStripMenuItem mi && Equals(mi.Tag, tag))
+                mi.Checked = mi.Text!.Equals(checkedText, StringComparison.OrdinalIgnoreCase);
+    }
+
     private void RebuildMenu()
     {
         var menu = _tray.ContextMenuStrip!;
@@ -236,17 +257,18 @@ public class TrayContext : ApplicationContext
             (_, _) => CycleZoneOverlay()));
 
         var layoutMenu = new ToolStripMenuItem("Forced Zones");
-        layoutMenu.DropDownItems.Add(new ToolStripMenuItem("Enabled", null, (_, _) =>
+        layoutMenu.DropDown.Closing += KeepOpenOnItemClick;
+        var fzEnabled = new ToolStripMenuItem("Enabled") { Checked = _engine.Config.ForcedZonesEnabled };
+        fzEnabled.Click += (_, _) =>
         {
             var cfg = _engine.Config;
             cfg.ForcedZonesEnabled = !cfg.ForcedZonesEnabled;
             if (!cfg.ForcedZonesEnabled) _engine.ReleaseAll();
             cfg.Save();
             CloseZoneOverlays();
-        })
-        {
-            Checked = _engine.Config.ForcedZonesEnabled,
-        });
+            fzEnabled.Checked = cfg.ForcedZonesEnabled;
+        };
+        layoutMenu.DropDownItems.Add(fzEnabled);
         layoutMenu.DropDownItems.Add(new ToolStripSeparator());
         foreach (var name in _engine.Config.Layouts.Keys)
         {
@@ -255,24 +277,27 @@ public class TrayContext : ApplicationContext
                 CloseAllBlackouts();
                 CloseZoneOverlays();
                 _engine.SetLayout(name);
+                RefreshRadio(layoutMenu, "fz-layout", _engine.Config.ActiveLayout);
             })
             {
                 Checked = name == _engine.Config.ActiveLayout,
+                Tag = "fz-layout",
             };
             layoutMenu.DropDownItems.Add(item);
         }
         menu.Items.Add(layoutMenu);
 
         var qzMenu = new ToolStripMenuItem("Quick Zones  (Shift+drag)");
-        qzMenu.DropDownItems.Add(new ToolStripMenuItem("Enabled", null, (_, _) =>
+        qzMenu.DropDown.Closing += KeepOpenOnItemClick;
+        var qzEnabled = new ToolStripMenuItem("Enabled") { Checked = _engine.Config.QuickZonesEnabled };
+        qzEnabled.Click += (_, _) =>
         {
             _engine.Config.QuickZonesEnabled = !_engine.Config.QuickZonesEnabled;
             _engine.Config.Save();
             CloseZoneOverlays();
-        })
-        {
-            Checked = _engine.Config.QuickZonesEnabled,
-        });
+            qzEnabled.Checked = _engine.Config.QuickZonesEnabled;
+        };
+        qzMenu.DropDownItems.Add(qzEnabled);
         qzMenu.DropDownItems.Add(new ToolStripSeparator());
         foreach (var name in _engine.Config.Layouts.Keys)
         {
@@ -280,18 +305,28 @@ public class TrayContext : ApplicationContext
             {
                 _engine.Config.QuickZonesLayout = name;
                 _engine.Config.Save();
+                RefreshRadio(qzMenu, "qz-layout", name);
             })
             {
                 Checked = name.Equals(_engine.Config.QuickZonesLayout, StringComparison.OrdinalIgnoreCase),
+                Tag = "qz-layout",
             });
         }
         menu.Items.Add(qzMenu);
 
-        menu.Items.Add(new ToolStripMenuItem("Create layout…", null, (_, _) => OpenEditor(null)));
+        menu.Items.Add(new ToolStripMenuItem("Create layout…", null, (_, _) =>
+        {
+            CloseMenu();
+            OpenEditor(null);
+        }));
 
         var editMenu = new ToolStripMenuItem("Edit layout");
         foreach (var name in _engine.Config.Layouts.Keys)
-            editMenu.DropDownItems.Add(new ToolStripMenuItem(name, null, (_, _) => OpenEditor(name)));
+            editMenu.DropDownItems.Add(new ToolStripMenuItem(name, null, (_, _) =>
+            {
+                CloseMenu();
+                OpenEditor(name);
+            }));
         menu.Items.Add(editMenu);
 
         var deleteMenu = new ToolStripMenuItem("Delete layout")
@@ -302,6 +337,7 @@ public class TrayContext : ApplicationContext
         {
             deleteMenu.DropDownItems.Add(new ToolStripMenuItem(name, null, (_, _) =>
             {
+                CloseMenu();
                 if (MessageBox.Show($"Delete layout '{name}'?", "ZoneEnforcer",
                         MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
                 bool wasActive = name.Equals(_engine.Config.ActiveLayout, StringComparison.OrdinalIgnoreCase);
@@ -316,30 +352,44 @@ public class TrayContext : ApplicationContext
         menu.Items.Add(deleteMenu);
 
         var blackoutMenu = new ToolStripMenuItem("Black out zone  (Ctrl+Alt+B)");
+        blackoutMenu.DropDown.Closing += KeepOpenOnItemClick;
         foreach (var zone in _engine.Config.ActiveZones)
         {
             var z = zone;
-            blackoutMenu.DropDownItems.Add(new ToolStripMenuItem(z.Name, null, (_, _) => ToggleBlackout(z))
+            var item = new ToolStripMenuItem(z.Name) { Checked = _blackouts.ContainsKey(z.Name), Tag = "bo" };
+            item.Click += (_, _) =>
             {
-                Checked = _blackouts.ContainsKey(z.Name),
-            });
+                ToggleBlackout(z);
+                item.Checked = _blackouts.ContainsKey(z.Name);
+            };
+            blackoutMenu.DropDownItems.Add(item);
         }
-        if (_blackouts.Count > 0)
+        blackoutMenu.DropDownItems.Add(new ToolStripSeparator());
+        blackoutMenu.DropDownItems.Add(new ToolStripMenuItem("Restore all", null, (_, _) =>
         {
-            blackoutMenu.DropDownItems.Add(new ToolStripSeparator());
-            blackoutMenu.DropDownItems.Add(new ToolStripMenuItem("Restore all", null, (_, _) => CloseAllBlackouts()));
-        }
+            CloseAllBlackouts();
+            foreach (ToolStripItem it in blackoutMenu.DropDownItems)
+                if (it is ToolStripMenuItem mi && Equals(mi.Tag, "bo")) mi.Checked = false;
+        }));
         menu.Items.Add(blackoutMenu);
 
         var assigned = new ToolStripMenuItem("Assigned windows");
+        assigned.DropDown.Closing += KeepOpenOnItemClick;
         foreach (var a in _engine.Assignments.Values)
         {
             var title = Native.GetWindowTitle(a.Hwnd);
             if (title.Length > 40) title = title[..40] + "…";
             var hwnd = a.Hwnd;
-            assigned.DropDownItems.Add(new ToolStripMenuItem(
-                $"{title}  [{a.Zone.Name}]  — click to release", null,
-                (_, _) => _engine.Release(hwnd)));
+            var item = new ToolStripMenuItem($"{title}  [{a.Zone.Name}]  — click to release");
+            item.Click += (_, _) =>
+            {
+                if (_engine.Release(hwnd))
+                {
+                    item.Text = $"{title}  (released)";
+                    item.Enabled = false;
+                }
+            };
+            assigned.DropDownItems.Add(item);
         }
         if (assigned.DropDownItems.Count == 0)
         {
@@ -354,27 +404,40 @@ public class TrayContext : ApplicationContext
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Reload config", null, (_, _) =>
         {
+            CloseMenu();
             CloseAllBlackouts();
             CloseZoneOverlays();
             _engine.ReloadConfig();
         }));
         menu.Items.Add(new ToolStripMenuItem("Open config file", null, (_, _) =>
-            System.Diagnostics.Process.Start("notepad.exe", Config.ConfigPath)));
-        menu.Items.Add(new ToolStripMenuItem("Focused window covers taskbar", null, (_, _) =>
-            _engine.SetTopmostOnFocus(!_engine.Config.TopmostOnFocus))
+        {
+            CloseMenu();
+            System.Diagnostics.Process.Start("notepad.exe", Config.ConfigPath);
+        }));
+        var ontopItem = new ToolStripMenuItem("Focused window covers taskbar")
         {
             Checked = _engine.Config.TopmostOnFocus,
-        });
-        menu.Items.Add(new ToolStripMenuItem("Run at startup", null, (_, _) =>
+        };
+        ontopItem.Click += (_, _) =>
+        {
+            _engine.SetTopmostOnFocus(!_engine.Config.TopmostOnFocus);
+            ontopItem.Checked = _engine.Config.TopmostOnFocus;
+        };
+        menu.Items.Add(ontopItem);
+        var startupItem = new ToolStripMenuItem("Run at startup") { Checked = StartupManager.IsEnabled };
+        startupItem.Click += (_, _) =>
         {
             if (StartupManager.IsEnabled) StartupManager.Disable();
             else StartupManager.Enable();
-        })
-        {
-            Checked = StartupManager.IsEnabled,
-        });
+            startupItem.Checked = StartupManager.IsEnabled;
+        };
+        menu.Items.Add(startupItem);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(new ToolStripMenuItem("Exit", null, (_, _) => ExitThread()));
+        menu.Items.Add(new ToolStripMenuItem("Exit", null, (_, _) =>
+        {
+            CloseMenu();
+            ExitThread();
+        }));
     }
 
     public string HandleCommand(string[] args)
