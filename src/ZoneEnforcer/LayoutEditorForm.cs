@@ -25,17 +25,19 @@ public class LayoutEditorForm : Form
 
     private readonly Rectangle _screen;
     private readonly string _layoutName;
-    private readonly Action<string, List<Zone>> _onSave;
+    private readonly Action<string, List<Zone>, bool> _onSave;
+    private bool _overTaskbar;
     private Node _root;
 
     private Node? _drag;
     private Rectangle _dragRect;
 
     public LayoutEditorForm(Rectangle screen, string layoutName, IReadOnlyList<Zone> zones,
-        Action<string, List<Zone>> onSave)
+        bool overTaskbar, Action<string, List<Zone>, bool> onSave)
     {
         _screen = screen;
         _layoutName = layoutName;
+        _overTaskbar = overTaskbar;
         _onSave = onSave;
         _root = TryImport(zones) ?? new Node();
 
@@ -220,8 +222,9 @@ public class LayoutEditorForm : Form
 
     private void SaveAndClose()
     {
-        using var prompt = new NamePrompt(_layoutName);
+        using var prompt = new NamePrompt(_layoutName, _overTaskbar);
         if (prompt.ShowDialog(this) != DialogResult.OK || prompt.Value.Length == 0) return;
+        _overTaskbar = prompt.OverTaskbar;
 
         var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var zones = new List<Zone>();
@@ -243,7 +246,7 @@ public class LayoutEditorForm : Form
                 Height = r.Height,
             });
         }
-        _onSave(prompt.Value, zones);
+        _onSave(prompt.Value, zones, _overTaskbar);
         Close();
     }
 
@@ -337,14 +340,16 @@ public class LayoutEditorForm : Form
     private sealed class NamePrompt : Form
     {
         private readonly TextBox _box = new();
+        private readonly CheckBox _overTaskbar = new();
         public string Value => _box.Text.Trim();
+        public bool OverTaskbar => _overTaskbar.Checked;
 
-        public NamePrompt(string initial)
+        public NamePrompt(string initial, bool overTaskbar)
         {
             Text = "Save layout";
             FormBorderStyle = FormBorderStyle.FixedDialog;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(320, 106);
+            ClientSize = new Size(320, 136);
             MinimizeBox = MaximizeBox = false;
             ShowInTaskbar = false;
             TopMost = true;
@@ -353,13 +358,16 @@ public class LayoutEditorForm : Form
             _box.SetBounds(12, 32, 296, 24);
             _box.Text = initial;
             _box.SelectAll();
+            _overTaskbar.Text = "Over taskbar (Quick Zones snap across it)";
+            _overTaskbar.SetBounds(12, 62, 296, 24);
+            _overTaskbar.Checked = overTaskbar;
             var ok = new Button { Text = "Save", DialogResult = DialogResult.OK };
-            ok.SetBounds(152, 68, 75, 28);
+            ok.SetBounds(152, 98, 75, 28);
             var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel };
-            cancel.SetBounds(233, 68, 75, 28);
+            cancel.SetBounds(233, 98, 75, 28);
             AcceptButton = ok;
             CancelButton = cancel;
-            Controls.AddRange(new Control[] { label, _box, ok, cancel });
+            Controls.AddRange(new Control[] { label, _box, _overTaskbar, ok, cancel });
         }
     }
 }

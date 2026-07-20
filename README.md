@@ -48,14 +48,14 @@ ZoneEnforcer.exe assign left notepad     # match by process name or title substr
 ZoneEnforcer.exe assign right "YouTube"
 ZoneEnforcer.exe release notepad         # or: release all
 ZoneEnforcer.exe layout thirds           # switch layout; bare "layout" lists them
-ZoneEnforcer.exe layout delete thirds    # delete a layout (also in the tray's Layout menu)
+ZoneEnforcer.exe layout delete thirds    # delete a layout (also in the tray's Forced Zones menu)
 ZoneEnforcer.exe blackout left           # toggle a black panel over a zone ("blackout off" restores all)
 ZoneEnforcer.exe edit                    # open the visual layout editor ("edit close" cancels)
 ZoneEnforcer.exe zones                   # flash the overlay
 ZoneEnforcer.exe reset                   # release all windows and blackouts
 ZoneEnforcer.exe startup on              # run when Windows starts (also in the tray menu)
 ZoneEnforcer.exe ontop off               # focused window no longer covers the taskbar (default: on)
-ZoneEnforcer.exe quickzones layout wide  # Shift+drag snapping layout ("follow" = same as active)
+ZoneEnforcer.exe quickzones layout wide  # choose the Shift+drag snapping layout
 ZoneEnforcer.exe reload                  # re-read config.json
 ZoneEnforcer.exe quit
 ```
@@ -66,10 +66,10 @@ FancyZones-style snapping built in: hold **Shift** while dragging any window and
 appears; drop the window into a zone to snap it there. This is a one-time move — the window keeps
 its border and is not clamped — so it coexists cleanly with enforced windows.
 
-Quick Zones has its own layout selection, independent of the enforcer's active layout: by default
-it follows the active layout, but the tray's "Quick Zones" submenu (or
-`quickzones layout <name>`) can point it at any other layout. Disable the feature entirely with
-the same submenu or `quickzones off`.
+Quick Zones has its own layout, fully independent of the Forced Zones layout — pick it in the
+tray's "Quick Zones" submenu or with `quickzones layout <name>`. Both selections can use the
+same layout or different ones. Disable the feature entirely with the same submenu or
+`quickzones off`.
 
 ## Layout editor
 
@@ -79,6 +79,11 @@ horizontally, **drag** a shared border to resize (snaps to halves, thirds, and q
 **right-click** a zone to remove it, **Enter** to save under a name, **Esc** to cancel. Zones live
 in a binary split tree, so the layout always tiles the screen exactly. Saving with an existing
 layout name overwrites it; a new name creates a new layout and switches to it.
+
+The save dialog has an **"Over taskbar"** checkbox, stored per layout: when checked, Quick Zones
+snaps windows across the full zone (extending behind the taskbar); when unchecked (default),
+snapped windows are clipped to the work area so they stop at the taskbar's edge. Enforced windows
+always use the full zone regardless — they cover the taskbar while focused.
 
 ## Blacking out a zone
 

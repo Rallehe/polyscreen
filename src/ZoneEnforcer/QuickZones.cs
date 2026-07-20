@@ -76,12 +76,16 @@ public class QuickZones : IDisposable
             {
                 if (Native.IsZoomed(hwnd)) Native.ShowWindow(hwnd, Native.SW_RESTORE);
 
-                // Snapped windows are normal windows (not topmost), so keep them out from
-                // under the taskbar by clipping the zone to the monitor's work area.
-                var target = Rectangle.Intersect(
-                    new Rectangle(zone.X, zone.Y, zone.Width, zone.Height),
-                    Screen.FromPoint(new Point(pt.X, pt.Y)).WorkingArea);
-                if (target.IsEmpty) target = new Rectangle(zone.X, zone.Y, zone.Width, zone.Height);
+                // Snapped windows are normal windows (not topmost), so by default keep them
+                // out from under the taskbar by clipping the zone to the monitor's work
+                // area. Layouts marked "over taskbar" use the full zone instead.
+                var target = new Rectangle(zone.X, zone.Y, zone.Width, zone.Height);
+                if (!(_engine.Config.QuickZonesDef?.OverTaskbar ?? false))
+                {
+                    var clipped = Rectangle.Intersect(target,
+                        Screen.FromPoint(new Point(pt.X, pt.Y)).WorkingArea);
+                    if (!clipped.IsEmpty) target = clipped;
+                }
 
                 // The window rect extends past the visible frame by the invisible resize
                 // borders; oversize the target by that margin so the visible window fills
