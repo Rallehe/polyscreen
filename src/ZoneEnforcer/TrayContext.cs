@@ -204,6 +204,29 @@ public class TrayContext : ApplicationContext
         }
         menu.Items.Add(layoutMenu);
 
+        var qzMenu = new ToolStripMenuItem("Quick Zones  (Shift+drag)");
+        qzMenu.DropDownItems.Add(new ToolStripMenuItem("Enabled", null, (_, _) =>
+        {
+            _engine.Config.QuickZonesEnabled = !_engine.Config.QuickZonesEnabled;
+            _engine.Config.Save();
+        })
+        {
+            Checked = _engine.Config.QuickZonesEnabled,
+        });
+        qzMenu.DropDownItems.Add(new ToolStripSeparator());
+        foreach (var name in _engine.Config.Layouts.Keys)
+        {
+            qzMenu.DropDownItems.Add(new ToolStripMenuItem(name, null, (_, _) =>
+            {
+                _engine.Config.QuickZonesLayout = name;
+                _engine.Config.Save();
+            })
+            {
+                Checked = name.Equals(_engine.Config.QuickZonesLayout, StringComparison.OrdinalIgnoreCase),
+            });
+        }
+        menu.Items.Add(qzMenu);
+
         menu.Items.Add(new ToolStripMenuItem("Create layout…", null, (_, _) => OpenEditor(null)));
 
         var editMenu = new ToolStripMenuItem("Edit layout");
@@ -247,29 +270,6 @@ public class TrayContext : ApplicationContext
             blackoutMenu.DropDownItems.Add(new ToolStripMenuItem("Restore all", null, (_, _) => CloseAllBlackouts()));
         }
         menu.Items.Add(blackoutMenu);
-
-        var qzMenu = new ToolStripMenuItem("Quick Zones  (Shift+drag)");
-        qzMenu.DropDownItems.Add(new ToolStripMenuItem("Enabled", null, (_, _) =>
-        {
-            _engine.Config.QuickZonesEnabled = !_engine.Config.QuickZonesEnabled;
-            _engine.Config.Save();
-        })
-        {
-            Checked = _engine.Config.QuickZonesEnabled,
-        });
-        qzMenu.DropDownItems.Add(new ToolStripSeparator());
-        foreach (var name in _engine.Config.Layouts.Keys)
-        {
-            qzMenu.DropDownItems.Add(new ToolStripMenuItem(name, null, (_, _) =>
-            {
-                _engine.Config.QuickZonesLayout = name;
-                _engine.Config.Save();
-            })
-            {
-                Checked = name.Equals(_engine.Config.QuickZonesLayout, StringComparison.OrdinalIgnoreCase),
-            });
-        }
-        menu.Items.Add(qzMenu);
 
         var assigned = new ToolStripMenuItem("Assigned windows");
         foreach (var a in _engine.Assignments.Values)
