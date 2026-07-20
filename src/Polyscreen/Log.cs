@@ -1,6 +1,6 @@
-namespace ZoneEnforcer;
+﻿namespace Polyscreen;
 
-/// <summary>Tiny file logger: %APPDATA%\ZoneEnforcer\log.txt.</summary>
+/// <summary>Tiny file logger: %APPDATA%\Polyscreen\log.txt.</summary>
 public static class Log
 {
     private static readonly object Lock = new();

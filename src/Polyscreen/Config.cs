@@ -1,7 +1,7 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace ZoneEnforcer;
+namespace Polyscreen;
 
 public class Zone
 {
@@ -83,7 +83,7 @@ public class Config
     /// <summary>Quick Zones: Shift+drag a window to snap it into a zone (one-time, no clamping).</summary>
     public bool QuickZonesEnabled { get; set; } = true;
 
-    /// <summary>Layout Quick Zones uses — independent of the Forced Zones active layout.
+    /// <summary>Layout Quick Zones uses â€” independent of the Forced Zones active layout.
     /// Initialized to the active layout when missing (e.g. older configs).</summary>
     public string? QuickZonesLayout { get; set; }
 
@@ -104,7 +104,7 @@ public class Config
         ActiveZones.FirstOrDefault(z => string.Equals(z.Name, name, StringComparison.OrdinalIgnoreCase));
 
     public static string ConfigDir =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ZoneEnforcer");
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Polyscreen");
 
     public static string ConfigPath => Path.Combine(ConfigDir, "config.json");
 
@@ -116,8 +116,25 @@ public class Config
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
+    /// <summary>The app used to be called ZoneEnforcer; carry its config folder over once.</summary>
+    private static void MigrateLegacyDir()
+    {
+        try
+        {
+            var old = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ZoneEnforcer");
+            if (Directory.Exists(old) && !Directory.Exists(ConfigDir))
+                Directory.Move(old, ConfigDir);
+        }
+        catch
+        {
+            // Fall through to defaults; never block startup on migration.
+        }
+    }
+
     public static Config Load()
     {
+        MigrateLegacyDir();
         if (File.Exists(ConfigPath))
         {
             var loaded = JsonSerializer.Deserialize<Config>(File.ReadAllText(ConfigPath), JsonOptions);

@@ -1,12 +1,12 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 
-namespace ZoneEnforcer;
+namespace Polyscreen;
 
-/// <summary>Autostart via the per-user Run key — no admin rights needed.</summary>
+/// <summary>Autostart via the per-user Run key â€” no admin rights needed.</summary>
 public static class StartupManager
 {
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string ValueName = "ZoneEnforcer";
+    private const string ValueName = "Polyscreen";
 
     private static string CurrentCommand => $"\"{Environment.ProcessPath}\"";
 
@@ -33,11 +33,19 @@ public static class StartupManager
         Log.Write("startup disabled");
     }
 
-    /// <summary>If autostart points at an old exe location, quietly repoint it at this one.</summary>
+    /// <summary>If autostart points at an old exe location, quietly repoint it at this one.
+    /// Also migrates the legacy "ZoneEnforcer" entry from before the app was renamed.</summary>
     public static void HealPathIfStale()
     {
         using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true);
-        if (key?.GetValue(ValueName) is string existing && existing != CurrentCommand)
+        if (key == null) return;
+        if (key.GetValue("ZoneEnforcer") != null)
+        {
+            key.DeleteValue("ZoneEnforcer", throwOnMissingValue: false);
+            key.SetValue(ValueName, CurrentCommand);
+            Log.Write($"startup entry migrated from ZoneEnforcer: {CurrentCommand}");
+        }
+        if (key.GetValue(ValueName) is string existing && existing != CurrentCommand)
         {
             key.SetValue(ValueName, CurrentCommand);
             Log.Write($"startup path updated: {existing} -> {CurrentCommand}");
