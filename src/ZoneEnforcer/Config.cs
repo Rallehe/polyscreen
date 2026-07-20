@@ -80,7 +80,8 @@ public class Config
     /// <summary>Quick Zones: Shift+drag a window to snap it into a zone (one-time, no clamping).</summary>
     public bool QuickZonesEnabled { get; set; } = true;
 
-    /// <summary>Layout Quick Zones uses; null/missing means "follow the enforcer's active layout".</summary>
+    /// <summary>Layout Quick Zones uses — independent of the Forced Zones active layout.
+    /// Initialized to the active layout when missing (e.g. older configs).</summary>
     public string? QuickZonesLayout { get; set; }
 
     [JsonIgnore]
@@ -117,9 +118,17 @@ public class Config
         if (File.Exists(ConfigPath))
         {
             var loaded = JsonSerializer.Deserialize<Config>(File.ReadAllText(ConfigPath), JsonOptions);
-            if (loaded != null && loaded.Layouts.Count > 0) return loaded;
+            if (loaded != null && loaded.Layouts.Count > 0)
+            {
+                // Quick Zones always has its own concrete layout; older configs used
+                // null to mean "follow the active layout", so materialize that here.
+                if (loaded.QuickZonesLayout == null || !loaded.Layouts.ContainsKey(loaded.QuickZonesLayout))
+                    loaded.QuickZonesLayout = loaded.ActiveLayout;
+                return loaded;
+            }
         }
         var def = CreateDefault();
+        def.QuickZonesLayout = def.ActiveLayout;
         def.Save();
         return def;
     }

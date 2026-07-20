@@ -184,7 +184,7 @@ public class TrayContext : ApplicationContext
         menu.Items.Add(new ToolStripMenuItem("Show zones  (Ctrl+Alt+Z)", null,
             (_, _) => OverlayForm.Flash(_engine.Config.ActiveZones)));
 
-        var layoutMenu = new ToolStripMenuItem("Layout");
+        var layoutMenu = new ToolStripMenuItem("Forced Zones");
         foreach (var name in _engine.Config.Layouts.Keys)
         {
             var item = new ToolStripMenuItem(name, null, (_, _) =>
@@ -248,14 +248,6 @@ public class TrayContext : ApplicationContext
             Checked = _engine.Config.QuickZonesEnabled,
         });
         qzMenu.DropDownItems.Add(new ToolStripSeparator());
-        qzMenu.DropDownItems.Add(new ToolStripMenuItem("Follow active layout", null, (_, _) =>
-        {
-            _engine.Config.QuickZonesLayout = null;
-            _engine.Config.Save();
-        })
-        {
-            Checked = _engine.Config.QuickZonesLayout == null,
-        });
         foreach (var name in _engine.Config.Layouts.Keys)
         {
             qzMenu.DropDownItems.Add(new ToolStripMenuItem(name, null, (_, _) =>
@@ -358,8 +350,9 @@ public class TrayContext : ApplicationContext
             case "list":
             {
                 var sb = new StringBuilder();
-                sb.AppendLine($"layout: {_engine.Config.ActiveLayout}");
+                sb.AppendLine($"forced zones layout: {_engine.Config.ActiveLayout}");
                 foreach (var z in _engine.Config.ActiveZones) sb.AppendLine($"  zone {z}");
+                sb.AppendLine($"quick zones layout: {_engine.Config.QuickZonesLayout}");
                 sb.AppendLine($"assigned: {_engine.Assignments.Count}");
                 foreach (var a in _engine.Assignments.Values)
                 {
@@ -428,8 +421,8 @@ public class TrayContext : ApplicationContext
             {
                 if (args.Length < 2)
                     return $"quick zones: {(_engine.Config.QuickZonesEnabled ? "on" : "off")}, " +
-                           $"layout: {_engine.Config.QuickZonesLayout ?? "(follows active)"} " +
-                           "(usage: quickzones on|off | quickzones layout <name|follow>)";
+                           $"layout: {_engine.Config.QuickZonesLayout} " +
+                           "(usage: quickzones on|off | quickzones layout <name>)";
                 switch (args[1].ToLowerInvariant())
                 {
                     case "on":
@@ -442,13 +435,7 @@ public class TrayContext : ApplicationContext
                         return "quick zones: off";
                     case "layout":
                     {
-                        if (args.Length < 3) return "usage: quickzones layout <name|follow>";
-                        if (args[2].Equals("follow", StringComparison.OrdinalIgnoreCase))
-                        {
-                            _engine.Config.QuickZonesLayout = null;
-                            _engine.Config.Save();
-                            return "quick zones layout: follows active layout";
-                        }
+                        if (args.Length < 3) return "usage: quickzones layout <name>";
                         var key = _engine.Config.Layouts.Keys.FirstOrDefault(k =>
                             k.Equals(args[2], StringComparison.OrdinalIgnoreCase));
                         if (key == null) return $"unknown layout '{args[2]}'";
@@ -457,7 +444,7 @@ public class TrayContext : ApplicationContext
                         return $"quick zones layout: {key}";
                     }
                     default:
-                        return "usage: quickzones on|off | quickzones layout <name|follow>";
+                        return "usage: quickzones on|off | quickzones layout <name>";
                 }
             }
             case "ontop":
@@ -516,7 +503,7 @@ public class TrayContext : ApplicationContext
           assign <zone> <process-or-title>   clamp a window into a zone
           release <process-or-title> | all   restore a window
           list                               show zones and assigned windows
-          layout [name]                      show or switch layout
+          layout [name]                      show or switch the Forced Zones layout
           layout delete <name>               delete a layout
           blackout <zone> | blackout off     toggle a black panel over a zone
           edit [close]                       open the visual layout editor
@@ -524,7 +511,7 @@ public class TrayContext : ApplicationContext
           reset                              release all windows and blackouts
           startup [on|off]                   run ZoneEnforcer when Windows starts
           ontop [on|off]                     focused clamped window covers the taskbar
-          quickzones on|off|layout <name>    Shift+drag snapping and its layout
+          quickzones on|off|layout <name>    Shift+drag snapping and its own layout
           reload                             reload config.json
           quit                               exit ZoneEnforcer
         Hotkeys: Ctrl+Alt+1..9 assign focused window, Ctrl+Alt+0 release,

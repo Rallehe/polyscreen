@@ -91,12 +91,12 @@ public class Engine : IDisposable
 
         bool wasActive = key.Equals(Config.ActiveLayout, StringComparison.OrdinalIgnoreCase);
         Config.Layouts.Remove(key);
-        if (key.Equals(Config.QuickZonesLayout, StringComparison.OrdinalIgnoreCase))
-            Config.QuickZonesLayout = null; // fall back to following the active layout
+        bool wasQuick = key.Equals(Config.QuickZonesLayout, StringComparison.OrdinalIgnoreCase);
         Log.Write($"layout deleted: {key}");
 
         if (wasActive) SetLayout(Config.Layouts.Keys.First()); // re-resolves zones and saves
-        else Config.Save();
+        if (wasQuick) Config.QuickZonesLayout = Config.ActiveLayout;
+        Config.Save();
         AssignmentsChanged?.Invoke();
         return null;
     }
