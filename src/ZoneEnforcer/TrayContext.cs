@@ -156,10 +156,12 @@ public class TrayContext : ApplicationContext
         }
         CloseAllBlackouts();
         var screen = Screen.PrimaryScreen!.Bounds;
+        _engine.Config.Layouts.TryGetValue(_engine.Config.ActiveLayout, out var activeDef);
         _editor = new LayoutEditorForm(screen, _engine.Config.ActiveLayout, _engine.Config.ActiveZones,
-            (name, zones) =>
+            activeDef?.OverTaskbar ?? false,
+            (name, zones, overTaskbar) =>
             {
-                _engine.Config.Layouts[name] = zones;
+                _engine.Config.Layouts[name] = new LayoutDef { Zones = zones, OverTaskbar = overTaskbar };
                 _engine.SetLayout(name); // persists the config and re-clamps assigned windows
                 OverlayForm.Flash(zones);
             });
@@ -372,7 +374,10 @@ public class TrayContext : ApplicationContext
             {
                 if (args.Length < 2)
                     return "layouts: " + string.Join(", ",
-                        _engine.Config.Layouts.Keys.Select(k => k == _engine.Config.ActiveLayout ? k + " (active)" : k));
+                        _engine.Config.Layouts.Select(kv =>
+                            kv.Key
+                            + (kv.Key == _engine.Config.ActiveLayout ? " (active)" : "")
+                            + (kv.Value.OverTaskbar ? " [over taskbar]" : "")));
                 if (args.Length >= 3 &&
                     (args[1].Equals("delete", StringComparison.OrdinalIgnoreCase) ||
                      args[1].Equals("remove", StringComparison.OrdinalIgnoreCase)))

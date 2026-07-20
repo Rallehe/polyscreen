@@ -80,6 +80,11 @@ horizontally, **drag** a shared border to resize (snaps to halves, thirds, and q
 in a binary split tree, so the layout always tiles the screen exactly. Saving with an existing
 layout name overwrites it; a new name creates a new layout and switches to it.
 
+The save dialog has an **"Over taskbar"** checkbox, stored per layout: when checked, Quick Zones
+snaps windows across the full zone (extending behind the taskbar); when unchecked (default),
+snapped windows are clipped to the work area so they stop at the taskbar's edge. Enforced windows
+always use the full zone regardless — they cover the taskbar while focused.
+
 ## Blacking out a zone
 
 Any zone can be covered with a pure-black, click-proof, never-focused panel — like turning that
