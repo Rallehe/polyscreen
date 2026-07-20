@@ -38,11 +38,13 @@ public class TrayContext : ApplicationContext
     private readonly NotifyIcon _tray;
     private readonly PipeServer _pipe;
     private readonly Dictionary<string, BlackoutForm> _blackouts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly QuickZones _quickZones;
     private LayoutEditorForm? _editor;
 
     public TrayContext()
     {
         _engine = new Engine(Config.Load());
+        _quickZones = new QuickZones(_engine);
         _marshal = new MarshalForm();
         _marshal.Hotkey += OnHotkey;
         RegisterHotkeys();
@@ -234,6 +236,37 @@ public class TrayContext : ApplicationContext
         }
         menu.Items.Add(blackoutMenu);
 
+        var qzMenu = new ToolStripMenuItem("Quick Zones  (Shift+drag)");
+        qzMenu.DropDownItems.Add(new ToolStripMenuItem("Enabled", null, (_, _) =>
+        {
+            _engine.Config.QuickZonesEnabled = !_engine.Config.QuickZonesEnabled;
+            _engine.Config.Save();
+        })
+        {
+            Checked = _engine.Config.QuickZonesEnabled,
+        });
+        qzMenu.DropDownItems.Add(new ToolStripSeparator());
+        qzMenu.DropDownItems.Add(new ToolStripMenuItem("Follow active layout", null, (_, _) =>
+        {
+            _engine.Config.QuickZonesLayout = null;
+            _engine.Config.Save();
+        })
+        {
+            Checked = _engine.Config.QuickZonesLayout == null,
+        });
+        foreach (var name in _engine.Config.Layouts.Keys)
+        {
+            qzMenu.DropDownItems.Add(new ToolStripMenuItem(name, null, (_, _) =>
+            {
+                _engine.Config.QuickZonesLayout = name;
+                _engine.Config.Save();
+            })
+            {
+                Checked = name.Equals(_engine.Config.QuickZonesLayout, StringComparison.OrdinalIgnoreCase),
+            });
+        }
+        menu.Items.Add(qzMenu);
+
         var assigned = new ToolStripMenuItem("Assigned windows");
         foreach (var a in _engine.Assignments.Values)
         {
@@ -386,6 +419,42 @@ public class TrayContext : ApplicationContext
             case "zones":
                 OverlayForm.Flash(_engine.Config.ActiveZones);
                 return string.Join(Environment.NewLine, _engine.Config.ActiveZones.Select(z => z.ToString()));
+            case "quickzones":
+            {
+                if (args.Length < 2)
+                    return $"quick zones: {(_engine.Config.QuickZonesEnabled ? "on" : "off")}, " +
+                           $"layout: {_engine.Config.QuickZonesLayout ?? "(follows active)"} " +
+                           "(usage: quickzones on|off | quickzones layout <name|follow>)";
+                switch (args[1].ToLowerInvariant())
+                {
+                    case "on":
+                        _engine.Config.QuickZonesEnabled = true;
+                        _engine.Config.Save();
+                        return "quick zones: on";
+                    case "off":
+                        _engine.Config.QuickZonesEnabled = false;
+                        _engine.Config.Save();
+                        return "quick zones: off";
+                    case "layout":
+                    {
+                        if (args.Length < 3) return "usage: quickzones layout <name|follow>";
+                        if (args[2].Equals("follow", StringComparison.OrdinalIgnoreCase))
+                        {
+                            _engine.Config.QuickZonesLayout = null;
+                            _engine.Config.Save();
+                            return "quick zones layout: follows active layout";
+                        }
+                        var key = _engine.Config.Layouts.Keys.FirstOrDefault(k =>
+                            k.Equals(args[2], StringComparison.OrdinalIgnoreCase));
+                        if (key == null) return $"unknown layout '{args[2]}'";
+                        _engine.Config.QuickZonesLayout = key;
+                        _engine.Config.Save();
+                        return $"quick zones layout: {key}";
+                    }
+                    default:
+                        return "usage: quickzones on|off | quickzones layout <name|follow>";
+                }
+            }
             case "ontop":
             {
                 if (args.Length < 2)
@@ -450,6 +519,7 @@ public class TrayContext : ApplicationContext
           reset                              release all windows and blackouts
           startup [on|off]                   run ZoneEnforcer when Windows starts
           ontop [on|off]                     focused clamped window covers the taskbar
+          quickzones on|off|layout <name>    Shift+drag snapping and its layout
           reload                             reload config.json
           quit                               exit ZoneEnforcer
         Hotkeys: Ctrl+Alt+1..9 assign focused window, Ctrl+Alt+0 release,
@@ -462,6 +532,7 @@ public class TrayContext : ApplicationContext
         _tray.Visible = false;
         CloseAllBlackouts();
         _editor?.Close();
+        _quickZones.Dispose();
         _pipe.Dispose();
         _engine.Dispose(); // releases all windows back to their original state
         for (int i = 1; i <= HotkeyPanicId; i++) Native.UnregisterHotKey(_marshal.Handle, i);

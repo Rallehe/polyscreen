@@ -28,6 +28,8 @@ public class Engine : IDisposable
 
     public Config Config { get; private set; }
     public event Action? AssignmentsChanged;
+    public event Action<IntPtr>? MoveSizeStart;
+    public event Action<IntPtr>? MoveSizeEnd;
 
     public Engine(Config config)
     {
@@ -35,7 +37,7 @@ public class Engine : IDisposable
         _hookProc = OnWinEvent;
         _hook = Native.SetWinEventHook(Native.EVENT_OBJECT_DESTROY, Native.EVENT_OBJECT_LOCATIONCHANGE,
             IntPtr.Zero, _hookProc, 0, 0, Native.WINEVENT_OUTOFCONTEXT);
-        _fgHook = Native.SetWinEventHook(Native.EVENT_SYSTEM_FOREGROUND, Native.EVENT_SYSTEM_FOREGROUND,
+        _fgHook = Native.SetWinEventHook(Native.EVENT_SYSTEM_FOREGROUND, Native.EVENT_SYSTEM_MOVESIZEEND,
             IntPtr.Zero, _hookProc, 0, 0, Native.WINEVENT_OUTOFCONTEXT);
 
         // Safety net for events missed while throttled, and for cleanup of dead windows.
@@ -89,6 +91,8 @@ public class Engine : IDisposable
 
         bool wasActive = key.Equals(Config.ActiveLayout, StringComparison.OrdinalIgnoreCase);
         Config.Layouts.Remove(key);
+        if (key.Equals(Config.QuickZonesLayout, StringComparison.OrdinalIgnoreCase))
+            Config.QuickZonesLayout = null; // fall back to following the active layout
         Log.Write($"layout deleted: {key}");
 
         if (wasActive) SetLayout(Config.Layouts.Keys.First()); // re-resolves zones and saves
@@ -203,6 +207,14 @@ public class Engine : IDisposable
         {
             case Native.EVENT_SYSTEM_FOREGROUND:
                 UpdateTopmost(hwnd);
+                break;
+
+            case Native.EVENT_SYSTEM_MOVESIZESTART:
+                MoveSizeStart?.Invoke(hwnd);
+                break;
+
+            case Native.EVENT_SYSTEM_MOVESIZEEND:
+                MoveSizeEnd?.Invoke(hwnd);
                 break;
 
             case Native.EVENT_OBJECT_DESTROY:

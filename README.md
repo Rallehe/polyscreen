@@ -55,9 +55,21 @@ ZoneEnforcer.exe zones                   # flash the overlay
 ZoneEnforcer.exe reset                   # release all windows and blackouts
 ZoneEnforcer.exe startup on              # run when Windows starts (also in the tray menu)
 ZoneEnforcer.exe ontop off               # focused window no longer covers the taskbar (default: on)
+ZoneEnforcer.exe quickzones layout wide  # Shift+drag snapping layout ("follow" = same as active)
 ZoneEnforcer.exe reload                  # re-read config.json
 ZoneEnforcer.exe quit
 ```
+
+## Quick Zones (Shift+drag)
+
+FancyZones-style snapping built in: hold **Shift** while dragging any window and a zone overlay
+appears; drop the window into a zone to snap it there. This is a one-time move — the window keeps
+its border and is not clamped — so it coexists cleanly with enforced windows.
+
+Quick Zones has its own layout selection, independent of the enforcer's active layout: by default
+it follows the active layout, but the tray's "Quick Zones" submenu (or
+`quickzones layout <name>`) can point it at any other layout. Disable the feature entirely with
+the same submenu or `quickzones off`.
 
 ## Layout editor
 
