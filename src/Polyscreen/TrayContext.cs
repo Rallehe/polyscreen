@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 
 namespace Polyscreen;
 
@@ -95,7 +95,7 @@ public class TrayContext : ApplicationContext
         _overlayState = 0;
     }
 
-    /// <summary>Ctrl+Alt+Z: forced zones â†’ quick zones â†’ hidden; disabled features are skipped.</summary>
+    /// <summary>Ctrl+Alt+Z: forced zones → quick zones → hidden; disabled features are skipped.</summary>
     private string CycleZoneOverlay()
     {
         var cfg = _engine.Config;
@@ -113,11 +113,11 @@ public class TrayContext : ApplicationContext
         {
             case 1:
                 _zoneOverlays.AddRange(OverlayForm.ShowPersistent(cfg.ActiveZones,
-                    $"Forced Zones â€” {cfg.ActiveLayout}"));
+                    $"Forced Zones — {cfg.ActiveLayout}"));
                 return $"showing forced zones ({cfg.ActiveLayout})";
             case 2:
                 _zoneOverlays.AddRange(OverlayForm.ShowPersistent(cfg.QuickZones,
-                    $"Quick Zones â€” {cfg.QuickZonesLayout}"));
+                    $"Quick Zones — {cfg.QuickZonesLayout}"));
                 return $"showing quick zones ({cfg.QuickZonesLayout})";
             default:
                 return "zone overlays hidden";
@@ -171,7 +171,7 @@ public class TrayContext : ApplicationContext
         }
         var zone = zones[id - 1];
         if (_engine.Assign(hwnd, zone))
-            Notify($"{Native.GetWindowTitle(hwnd)} â†’ {zone.Name}");
+            Notify($"{Native.GetWindowTitle(hwnd)} → {zone.Name}");
     }
 
     private void ToggleBlackout(Zone zone)
@@ -229,7 +229,7 @@ public class TrayContext : ApplicationContext
     }
 
     /// <summary>
-    /// Clicking a toggle shouldn't dismiss the menu â€” so item clicks never auto-close it.
+    /// Clicking a toggle shouldn't dismiss the menu — so item clicks never auto-close it.
     /// Actions that open something else (editor, config, exit) call CloseMenu explicitly,
     /// and clicking outside or pressing Esc still closes normally.
     /// </summary>
@@ -314,7 +314,7 @@ public class TrayContext : ApplicationContext
         }
         menu.Items.Add(qzMenu);
 
-        menu.Items.Add(new ToolStripMenuItem("Create layoutâ€¦", null, (_, _) =>
+        menu.Items.Add(new ToolStripMenuItem("Create layout…", null, (_, _) =>
         {
             CloseMenu();
             OpenEditor(null);
@@ -378,9 +378,9 @@ public class TrayContext : ApplicationContext
         foreach (var a in _engine.Assignments.Values)
         {
             var title = Native.GetWindowTitle(a.Hwnd);
-            if (title.Length > 40) title = title[..40] + "â€¦";
+            if (title.Length > 40) title = title[..40] + "…";
             var hwnd = a.Hwnd;
-            var item = new ToolStripMenuItem($"{title}  [{a.Zone.Name}]  â€” click to release");
+            var item = new ToolStripMenuItem($"{title}  [{a.Zone.Name}]  — click to release");
             item.Click += (_, _) =>
             {
                 if (_engine.Release(hwnd))
@@ -393,7 +393,7 @@ public class TrayContext : ApplicationContext
         }
         if (assigned.DropDownItems.Count == 0)
         {
-            assigned.DropDownItems.Add(new ToolStripMenuItem("(none â€” focus a window, press Ctrl+Alt+1..9)")
+            assigned.DropDownItems.Add(new ToolStripMenuItem("(none — focus a window, press Ctrl+Alt+1..9)")
             {
                 Enabled = false,
             });

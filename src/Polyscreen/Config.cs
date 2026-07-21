@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Polyscreen;
@@ -83,7 +83,7 @@ public class Config
     /// <summary>Quick Zones: Shift+drag a window to snap it into a zone (one-time, no clamping).</summary>
     public bool QuickZonesEnabled { get; set; } = true;
 
-    /// <summary>Layout Quick Zones uses â€” independent of the Forced Zones active layout.
+    /// <summary>Layout Quick Zones uses — independent of the Forced Zones active layout.
     /// Initialized to the active layout when missing (e.g. older configs).</summary>
     public string? QuickZonesLayout { get; set; }
 

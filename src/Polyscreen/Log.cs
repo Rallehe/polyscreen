@@ -1,4 +1,4 @@
-﻿namespace Polyscreen;
+namespace Polyscreen;
 
 /// <summary>Tiny file logger: %APPDATA%\Polyscreen\log.txt.</summary>
 public static class Log

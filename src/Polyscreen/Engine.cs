@@ -1,4 +1,4 @@
-﻿namespace Polyscreen;
+namespace Polyscreen;
 
 public class Assignment
 {
@@ -152,7 +152,7 @@ public class Engine : IDisposable
                     Log.Write($"topmost set for {a.Hwnd} (fg={foreground}, ok={ok})");
                 }
                 // Topmost windows share one z-band with the taskbar and blackout panels,
-                // and any of those being raised (e.g. a tray click) reorders the band â€”
+                // and any of those being raised (e.g. a tray click) reorders the band —
                 // so re-raise to the top of the band on every focus, not just the first.
                 Native.SetWindowPos(a.Hwnd, Native.HWND_TOP, 0, 0, 0, 0,
                     Native.SWP_NOMOVE | Native.SWP_NOSIZE | Native.SWP_NOACTIVATE);
@@ -300,7 +300,7 @@ public class Engine : IDisposable
         if (force || moved || frameChanged)
         {
             // SWP_NOSENDCHANGING skips WM_WINDOWPOSCHANGING, so the app cannot veto
-            // the move â€” fullscreen Chromium windows otherwise pin themselves to the
+            // the move — fullscreen Chromium windows otherwise pin themselves to the
             // monitor bounds and the clamp silently never lands.
             uint flags = Native.SWP_NOZORDER | Native.SWP_NOACTIVATE | Native.SWP_NOOWNERZORDER |
                          Native.SWP_NOSENDCHANGING;

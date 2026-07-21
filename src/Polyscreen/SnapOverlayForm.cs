@@ -1,4 +1,4 @@
-﻿namespace Polyscreen;
+namespace Polyscreen;
 
 /// <summary>
 /// Click-through overlay shown while Shift-dragging a window: dims the screen,
