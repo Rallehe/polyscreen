@@ -1,8 +1,8 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 
 namespace Polyscreen;
 
-/// <summary>Autostart via the per-user Run key â€” no admin rights needed.</summary>
+/// <summary>Autostart via the per-user Run key — no admin rights needed.</summary>
 public static class StartupManager
 {
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";

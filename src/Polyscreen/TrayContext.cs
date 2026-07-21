@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 
 namespace Polyscreen;
 
@@ -95,7 +95,7 @@ public class TrayContext : ApplicationContext
         _overlayState = 0;
     }
 
-    /// <summary>Ctrl+Alt+Z: forced zones â†’ quick zones â†’ hidden; disabled features are skipped.</summary>
+    /// <summary>Ctrl+Alt+Z: forced zones → quick zones → hidden; disabled features are skipped.</summary>
     private string CycleZoneOverlay()
     {
         var cfg = _engine.Config;
@@ -105,19 +105,18 @@ public class TrayContext : ApplicationContext
             next = (next + 1) % 3;
         } while ((next == 1 && !cfg.ForcedZonesEnabled) || (next == 2 && !cfg.QuickZonesEnabled));
 
-        foreach (var f in _zoneOverlays) f.Close();
-        _zoneOverlays.Clear();
+        CloseZoneOverlays();
         _overlayState = next;
 
         switch (next)
         {
             case 1:
                 _zoneOverlays.AddRange(OverlayForm.ShowPersistent(cfg.ActiveZones,
-                    $"Forced Zones â€” {cfg.ActiveLayout}"));
+                    $"Forced Zones — {cfg.ActiveLayout}"));
                 return $"showing forced zones ({cfg.ActiveLayout})";
             case 2:
                 _zoneOverlays.AddRange(OverlayForm.ShowPersistent(cfg.QuickZones,
-                    $"Quick Zones â€” {cfg.QuickZonesLayout}"));
+                    $"Quick Zones — {cfg.QuickZonesLayout}"));
                 return $"showing quick zones ({cfg.QuickZonesLayout})";
             default:
                 return "zone overlays hidden";
@@ -171,7 +170,7 @@ public class TrayContext : ApplicationContext
         }
         var zone = zones[id - 1];
         if (_engine.Assign(hwnd, zone))
-            Notify($"{Native.GetWindowTitle(hwnd)} â†’ {zone.Name}");
+            Notify($"{Native.GetWindowTitle(hwnd)} → {zone.Name}");
     }
 
     private void ToggleBlackout(Zone zone)
@@ -229,7 +228,7 @@ public class TrayContext : ApplicationContext
     }
 
     /// <summary>
-    /// Clicking a toggle shouldn't dismiss the menu â€” so item clicks never auto-close it.
+    /// Clicking a toggle shouldn't dismiss the menu — so item clicks never auto-close it.
     /// Actions that open something else (editor, config, exit) call CloseMenu explicitly,
     /// and clicking outside or pressing Esc still closes normally.
     /// </summary>
@@ -239,6 +238,14 @@ public class TrayContext : ApplicationContext
     }
 
     private void CloseMenu() => _tray.ContextMenuStrip!.Close(ToolStripDropDownCloseReason.CloseCalled);
+
+    /// <summary>Parse an on/off CLI argument; null if it is neither.</summary>
+    private static bool? ParseToggle(string s) =>
+        s.Equals("on", StringComparison.OrdinalIgnoreCase) ? true
+        : s.Equals("off", StringComparison.OrdinalIgnoreCase) ? false
+        : null;
+
+    private static string OnOff(bool b) => b ? "on" : "off";
 
     /// <summary>Refresh the radio checkmarks of sibling items sharing a Tag, in place.</summary>
     private static void RefreshRadio(ToolStripMenuItem parent, string tag, string checkedText)
@@ -261,12 +268,9 @@ public class TrayContext : ApplicationContext
         var fzEnabled = new ToolStripMenuItem("Enabled") { Checked = _engine.Config.ForcedZonesEnabled };
         fzEnabled.Click += (_, _) =>
         {
-            var cfg = _engine.Config;
-            cfg.ForcedZonesEnabled = !cfg.ForcedZonesEnabled;
-            if (!cfg.ForcedZonesEnabled) _engine.ReleaseAll();
-            cfg.Save();
+            _engine.SetForcedZonesEnabled(!_engine.Config.ForcedZonesEnabled);
             CloseZoneOverlays();
-            fzEnabled.Checked = cfg.ForcedZonesEnabled;
+            fzEnabled.Checked = _engine.Config.ForcedZonesEnabled;
         };
         layoutMenu.DropDownItems.Add(fzEnabled);
         layoutMenu.DropDownItems.Add(new ToolStripSeparator());
@@ -292,8 +296,7 @@ public class TrayContext : ApplicationContext
         var qzEnabled = new ToolStripMenuItem("Enabled") { Checked = _engine.Config.QuickZonesEnabled };
         qzEnabled.Click += (_, _) =>
         {
-            _engine.Config.QuickZonesEnabled = !_engine.Config.QuickZonesEnabled;
-            _engine.Config.Save();
+            _engine.SetQuickZonesEnabled(!_engine.Config.QuickZonesEnabled);
             CloseZoneOverlays();
             qzEnabled.Checked = _engine.Config.QuickZonesEnabled;
         };
@@ -314,7 +317,7 @@ public class TrayContext : ApplicationContext
         }
         menu.Items.Add(qzMenu);
 
-        menu.Items.Add(new ToolStripMenuItem("Create layoutâ€¦", null, (_, _) =>
+        menu.Items.Add(new ToolStripMenuItem("Create layout…", null, (_, _) =>
         {
             CloseMenu();
             OpenEditor(null);
@@ -378,9 +381,9 @@ public class TrayContext : ApplicationContext
         foreach (var a in _engine.Assignments.Values)
         {
             var title = Native.GetWindowTitle(a.Hwnd);
-            if (title.Length > 40) title = title[..40] + "â€¦";
+            if (title.Length > 40) title = title[..40] + "…";
             var hwnd = a.Hwnd;
-            var item = new ToolStripMenuItem($"{title}  [{a.Zone.Name}]  â€” click to release");
+            var item = new ToolStripMenuItem($"{title}  [{a.Zone.Name}]  — click to release");
             item.Click += (_, _) =>
             {
                 if (_engine.Release(hwnd))
@@ -393,7 +396,7 @@ public class TrayContext : ApplicationContext
         }
         if (assigned.DropDownItems.Count == 0)
         {
-            assigned.DropDownItems.Add(new ToolStripMenuItem("(none â€” focus a window, press Ctrl+Alt+1..9)")
+            assigned.DropDownItems.Add(new ToolStripMenuItem("(none — focus a window, press Ctrl+Alt+1..9)")
             {
                 Enabled = false,
             });
@@ -568,86 +571,49 @@ public class TrayContext : ApplicationContext
             case "forcedzones":
             {
                 if (args.Length < 2)
-                    return $"forced zones: {(_engine.Config.ForcedZonesEnabled ? "on" : "off")}, " +
+                    return $"forced zones: {OnOff(_engine.Config.ForcedZonesEnabled)}, " +
                            $"layout: {_engine.Config.ActiveLayout} (usage: forcedzones on|off)";
-                if (args[1].Equals("on", StringComparison.OrdinalIgnoreCase))
-                {
-                    _engine.Config.ForcedZonesEnabled = true;
-                    _engine.Config.Save();
-                    return "forced zones: on";
-                }
-                if (args[1].Equals("off", StringComparison.OrdinalIgnoreCase))
-                {
-                    _engine.Config.ForcedZonesEnabled = false;
-                    _engine.ReleaseAll();
-                    _engine.Config.Save();
-                    CloseZoneOverlays();
-                    return "forced zones: off (all windows released)";
-                }
-                return "usage: forcedzones on|off";
+                if (ParseToggle(args[1]) is not bool on) return "usage: forcedzones on|off";
+                _engine.SetForcedZonesEnabled(on);
+                CloseZoneOverlays();
+                return on ? "forced zones: on" : "forced zones: off (all windows released)";
             }
             case "quickzones":
             {
                 if (args.Length < 2)
-                    return $"quick zones: {(_engine.Config.QuickZonesEnabled ? "on" : "off")}, " +
+                    return $"quick zones: {OnOff(_engine.Config.QuickZonesEnabled)}, " +
                            $"layout: {_engine.Config.QuickZonesLayout} " +
                            "(usage: quickzones on|off | quickzones layout <name>)";
-                switch (args[1].ToLowerInvariant())
+                if (args[1].Equals("layout", StringComparison.OrdinalIgnoreCase))
                 {
-                    case "on":
-                        _engine.Config.QuickZonesEnabled = true;
-                        _engine.Config.Save();
-                        return "quick zones: on";
-                    case "off":
-                        _engine.Config.QuickZonesEnabled = false;
-                        _engine.Config.Save();
-                        CloseZoneOverlays();
-                        return "quick zones: off";
-                    case "layout":
-                    {
-                        if (args.Length < 3) return "usage: quickzones layout <name>";
-                        var key = _engine.Config.Layouts.Keys.FirstOrDefault(k =>
-                            k.Equals(args[2], StringComparison.OrdinalIgnoreCase));
-                        if (key == null) return $"unknown layout '{args[2]}'";
-                        _engine.Config.QuickZonesLayout = key;
-                        _engine.Config.Save();
-                        return $"quick zones layout: {key}";
-                    }
-                    default:
-                        return "usage: quickzones on|off | quickzones layout <name>";
+                    if (args.Length < 3) return "usage: quickzones layout <name>";
+                    var key = _engine.Config.Layouts.Keys.FirstOrDefault(k =>
+                        k.Equals(args[2], StringComparison.OrdinalIgnoreCase));
+                    if (key == null) return $"unknown layout '{args[2]}'";
+                    _engine.Config.QuickZonesLayout = key;
+                    _engine.Config.Save();
+                    return $"quick zones layout: {key}";
                 }
+                if (ParseToggle(args[1]) is not bool on) return "usage: quickzones on|off | quickzones layout <name>";
+                _engine.SetQuickZonesEnabled(on);
+                CloseZoneOverlays();
+                return $"quick zones: {OnOff(on)}";
             }
             case "ontop":
             {
                 if (args.Length < 2)
-                    return $"focused window covers taskbar: {(_engine.Config.TopmostOnFocus ? "on" : "off")} (usage: ontop on|off)";
-                if (args[1].Equals("on", StringComparison.OrdinalIgnoreCase))
-                {
-                    _engine.SetTopmostOnFocus(true);
-                    return "focused window covers taskbar: on";
-                }
-                if (args[1].Equals("off", StringComparison.OrdinalIgnoreCase))
-                {
-                    _engine.SetTopmostOnFocus(false);
-                    return "focused window covers taskbar: off";
-                }
-                return "usage: ontop on|off";
+                    return $"focused window covers taskbar: {OnOff(_engine.Config.TopmostOnFocus)} (usage: ontop on|off)";
+                if (ParseToggle(args[1]) is not bool on) return "usage: ontop on|off";
+                _engine.SetTopmostOnFocus(on);
+                return $"focused window covers taskbar: {OnOff(on)}";
             }
             case "startup":
             {
                 if (args.Length < 2)
-                    return $"run at startup: {(StartupManager.IsEnabled ? "on" : "off")} (usage: startup on|off)";
-                if (args[1].Equals("on", StringComparison.OrdinalIgnoreCase))
-                {
-                    StartupManager.Enable();
-                    return "run at startup: on";
-                }
-                if (args[1].Equals("off", StringComparison.OrdinalIgnoreCase))
-                {
-                    StartupManager.Disable();
-                    return "run at startup: off";
-                }
-                return "usage: startup on|off";
+                    return $"run at startup: {OnOff(StartupManager.IsEnabled)} (usage: startup on|off)";
+                if (ParseToggle(args[1]) is not bool on) return "usage: startup on|off";
+                if (on) StartupManager.Enable(); else StartupManager.Disable();
+                return $"run at startup: {OnOff(on)}";
             }
             case "reset":
             {
