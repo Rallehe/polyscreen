@@ -105,8 +105,7 @@ public class TrayContext : ApplicationContext
             next = (next + 1) % 3;
         } while ((next == 1 && !cfg.ForcedZonesEnabled) || (next == 2 && !cfg.QuickZonesEnabled));
 
-        foreach (var f in _zoneOverlays) f.Close();
-        _zoneOverlays.Clear();
+        CloseZoneOverlays();
         _overlayState = next;
 
         switch (next)
@@ -240,6 +239,14 @@ public class TrayContext : ApplicationContext
 
     private void CloseMenu() => _tray.ContextMenuStrip!.Close(ToolStripDropDownCloseReason.CloseCalled);
 
+    /// <summary>Parse an on/off CLI argument; null if it is neither.</summary>
+    private static bool? ParseToggle(string s) =>
+        s.Equals("on", StringComparison.OrdinalIgnoreCase) ? true
+        : s.Equals("off", StringComparison.OrdinalIgnoreCase) ? false
+        : null;
+
+    private static string OnOff(bool b) => b ? "on" : "off";
+
     /// <summary>Refresh the radio checkmarks of sibling items sharing a Tag, in place.</summary>
     private static void RefreshRadio(ToolStripMenuItem parent, string tag, string checkedText)
     {
@@ -261,12 +268,9 @@ public class TrayContext : ApplicationContext
         var fzEnabled = new ToolStripMenuItem("Enabled") { Checked = _engine.Config.ForcedZonesEnabled };
         fzEnabled.Click += (_, _) =>
         {
-            var cfg = _engine.Config;
-            cfg.ForcedZonesEnabled = !cfg.ForcedZonesEnabled;
-            if (!cfg.ForcedZonesEnabled) _engine.ReleaseAll();
-            cfg.Save();
+            _engine.SetForcedZonesEnabled(!_engine.Config.ForcedZonesEnabled);
             CloseZoneOverlays();
-            fzEnabled.Checked = cfg.ForcedZonesEnabled;
+            fzEnabled.Checked = _engine.Config.ForcedZonesEnabled;
         };
         layoutMenu.DropDownItems.Add(fzEnabled);
         layoutMenu.DropDownItems.Add(new ToolStripSeparator());
@@ -292,8 +296,7 @@ public class TrayContext : ApplicationContext
         var qzEnabled = new ToolStripMenuItem("Enabled") { Checked = _engine.Config.QuickZonesEnabled };
         qzEnabled.Click += (_, _) =>
         {
-            _engine.Config.QuickZonesEnabled = !_engine.Config.QuickZonesEnabled;
-            _engine.Config.Save();
+            _engine.SetQuickZonesEnabled(!_engine.Config.QuickZonesEnabled);
             CloseZoneOverlays();
             qzEnabled.Checked = _engine.Config.QuickZonesEnabled;
         };
@@ -568,86 +571,49 @@ public class TrayContext : ApplicationContext
             case "forcedzones":
             {
                 if (args.Length < 2)
-                    return $"forced zones: {(_engine.Config.ForcedZonesEnabled ? "on" : "off")}, " +
+                    return $"forced zones: {OnOff(_engine.Config.ForcedZonesEnabled)}, " +
                            $"layout: {_engine.Config.ActiveLayout} (usage: forcedzones on|off)";
-                if (args[1].Equals("on", StringComparison.OrdinalIgnoreCase))
-                {
-                    _engine.Config.ForcedZonesEnabled = true;
-                    _engine.Config.Save();
-                    return "forced zones: on";
-                }
-                if (args[1].Equals("off", StringComparison.OrdinalIgnoreCase))
-                {
-                    _engine.Config.ForcedZonesEnabled = false;
-                    _engine.ReleaseAll();
-                    _engine.Config.Save();
-                    CloseZoneOverlays();
-                    return "forced zones: off (all windows released)";
-                }
-                return "usage: forcedzones on|off";
+                if (ParseToggle(args[1]) is not bool on) return "usage: forcedzones on|off";
+                _engine.SetForcedZonesEnabled(on);
+                CloseZoneOverlays();
+                return on ? "forced zones: on" : "forced zones: off (all windows released)";
             }
             case "quickzones":
             {
                 if (args.Length < 2)
-                    return $"quick zones: {(_engine.Config.QuickZonesEnabled ? "on" : "off")}, " +
+                    return $"quick zones: {OnOff(_engine.Config.QuickZonesEnabled)}, " +
                            $"layout: {_engine.Config.QuickZonesLayout} " +
                            "(usage: quickzones on|off | quickzones layout <name>)";
-                switch (args[1].ToLowerInvariant())
+                if (args[1].Equals("layout", StringComparison.OrdinalIgnoreCase))
                 {
-                    case "on":
-                        _engine.Config.QuickZonesEnabled = true;
-                        _engine.Config.Save();
-                        return "quick zones: on";
-                    case "off":
-                        _engine.Config.QuickZonesEnabled = false;
-                        _engine.Config.Save();
-                        CloseZoneOverlays();
-                        return "quick zones: off";
-                    case "layout":
-                    {
-                        if (args.Length < 3) return "usage: quickzones layout <name>";
-                        var key = _engine.Config.Layouts.Keys.FirstOrDefault(k =>
-                            k.Equals(args[2], StringComparison.OrdinalIgnoreCase));
-                        if (key == null) return $"unknown layout '{args[2]}'";
-                        _engine.Config.QuickZonesLayout = key;
-                        _engine.Config.Save();
-                        return $"quick zones layout: {key}";
-                    }
-                    default:
-                        return "usage: quickzones on|off | quickzones layout <name>";
+                    if (args.Length < 3) return "usage: quickzones layout <name>";
+                    var key = _engine.Config.Layouts.Keys.FirstOrDefault(k =>
+                        k.Equals(args[2], StringComparison.OrdinalIgnoreCase));
+                    if (key == null) return $"unknown layout '{args[2]}'";
+                    _engine.Config.QuickZonesLayout = key;
+                    _engine.Config.Save();
+                    return $"quick zones layout: {key}";
                 }
+                if (ParseToggle(args[1]) is not bool on) return "usage: quickzones on|off | quickzones layout <name>";
+                _engine.SetQuickZonesEnabled(on);
+                CloseZoneOverlays();
+                return $"quick zones: {OnOff(on)}";
             }
             case "ontop":
             {
                 if (args.Length < 2)
-                    return $"focused window covers taskbar: {(_engine.Config.TopmostOnFocus ? "on" : "off")} (usage: ontop on|off)";
-                if (args[1].Equals("on", StringComparison.OrdinalIgnoreCase))
-                {
-                    _engine.SetTopmostOnFocus(true);
-                    return "focused window covers taskbar: on";
-                }
-                if (args[1].Equals("off", StringComparison.OrdinalIgnoreCase))
-                {
-                    _engine.SetTopmostOnFocus(false);
-                    return "focused window covers taskbar: off";
-                }
-                return "usage: ontop on|off";
+                    return $"focused window covers taskbar: {OnOff(_engine.Config.TopmostOnFocus)} (usage: ontop on|off)";
+                if (ParseToggle(args[1]) is not bool on) return "usage: ontop on|off";
+                _engine.SetTopmostOnFocus(on);
+                return $"focused window covers taskbar: {OnOff(on)}";
             }
             case "startup":
             {
                 if (args.Length < 2)
-                    return $"run at startup: {(StartupManager.IsEnabled ? "on" : "off")} (usage: startup on|off)";
-                if (args[1].Equals("on", StringComparison.OrdinalIgnoreCase))
-                {
-                    StartupManager.Enable();
-                    return "run at startup: on";
-                }
-                if (args[1].Equals("off", StringComparison.OrdinalIgnoreCase))
-                {
-                    StartupManager.Disable();
-                    return "run at startup: off";
-                }
-                return "usage: startup on|off";
+                    return $"run at startup: {OnOff(StartupManager.IsEnabled)} (usage: startup on|off)";
+                if (ParseToggle(args[1]) is not bool on) return "usage: startup on|off";
+                if (on) StartupManager.Enable(); else StartupManager.Disable();
+                return $"run at startup: {OnOff(on)}";
             }
             case "reset":
             {

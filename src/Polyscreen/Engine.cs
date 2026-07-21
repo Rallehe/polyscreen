@@ -174,6 +174,20 @@ public class Engine : IDisposable
         UpdateTopmost(Native.GetForegroundWindow());
     }
 
+    /// <summary>Toggle Forced Zones. Disabling releases every clamped window.</summary>
+    public void SetForcedZonesEnabled(bool enabled)
+    {
+        Config.ForcedZonesEnabled = enabled;
+        if (!enabled) ReleaseAll();
+        Config.Save();
+    }
+
+    public void SetQuickZonesEnabled(bool enabled)
+    {
+        Config.QuickZonesEnabled = enabled;
+        Config.Save();
+    }
+
     public bool Release(IntPtr hwnd)
     {
         if (!_assignments.Remove(hwnd, out var a)) return false;
