@@ -6,8 +6,7 @@ public class Assignment
     public Zone Zone = new();
     public IntPtr OrigStyle;
     public IntPtr OrigExStyle;
-    public RECT OrigRect;
-    public bool WasMaximized;
+    public Native.WINDOWPLACEMENT OrigPlacement; // position + show state (maximized/normal) at assign time
     public bool IsTopmost;
     public DateTime LastEnforce = DateTime.MinValue;
 }
@@ -121,9 +120,8 @@ public class Engine : IDisposable
             Zone = zone,
             OrigStyle = Native.GetWindowLongPtr(hwnd, Native.GWL_STYLE),
             OrigExStyle = Native.GetWindowLongPtr(hwnd, Native.GWL_EXSTYLE),
-            WasMaximized = Native.IsZoomed(hwnd),
+            OrigPlacement = Native.GetPlacement(hwnd),
         };
-        Native.GetWindowRect(hwnd, out a.OrigRect);
 
         _assignments[hwnd] = a;
         Log.Write($"assign {hwnd} \"{Native.GetWindowTitle(hwnd)}\" -> {zone}");
@@ -199,10 +197,19 @@ public class Engine : IDisposable
             Native.SetWindowLongPtr(hwnd, Native.GWL_STYLE, a.OrigStyle);
             Native.SetWindowLongPtr(hwnd, Native.GWL_EXSTYLE, a.OrigExStyle);
             ApplyDwmDecoration(hwnd, clamped: false);
-            Native.SetWindowPos(hwnd, IntPtr.Zero, a.OrigRect.Left, a.OrigRect.Top,
-                a.OrigRect.Width, a.OrigRect.Height,
-                Native.SWP_NOZORDER | Native.SWP_NOACTIVATE | Native.SWP_NOOWNERZORDER | Native.SWP_FRAMECHANGED);
-            if (a.WasMaximized) Native.ShowWindow(hwnd, Native.SW_MAXIMIZE);
+
+            // Restore the original position, but force a normal (non-maximized) show
+            // state: a maximized window can't be edge-resized, so re-maximizing one that
+            // was maximized at assign time made Polyscreen look like it broke resizing
+            // until the app was relaunched. SetWindowPlacement restores the normal rect.
+            var wp = a.OrigPlacement;
+            wp.showCmd = Native.SW_SHOWNORMAL;
+            Native.SetWindowPlacement(hwnd, ref wp);
+
+            // Recompute the non-client frame now that the caption/resize border are back.
+            Native.SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0,
+                Native.SWP_NOMOVE | Native.SWP_NOSIZE | Native.SWP_NOZORDER |
+                Native.SWP_NOACTIVATE | Native.SWP_NOOWNERZORDER | Native.SWP_FRAMECHANGED);
         }
         AssignmentsChanged?.Invoke();
         return true;
