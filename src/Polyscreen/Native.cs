@@ -59,8 +59,33 @@ public static class Native
     public const uint SWP_NOSENDCHANGING = 0x0400;
 
     // ShowWindow
+    public const int SW_SHOWNORMAL = 1;
     public const int SW_RESTORE = 9;
-    public const int SW_MAXIMIZE = 3;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct WINDOWPLACEMENT
+    {
+        public int length;
+        public int flags;
+        public int showCmd;
+        public POINT ptMinPosition;
+        public POINT ptMaxPosition;
+        public RECT rcNormalPosition;
+    }
+
+    [DllImport("user32.dll")]
+    public static extern bool GetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT lpwndpl);
+
+    [DllImport("user32.dll")]
+    public static extern bool SetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT lpwndpl);
+
+    /// <summary>GetWindowPlacement with the length field initialized.</summary>
+    public static WINDOWPLACEMENT GetPlacement(IntPtr hwnd)
+    {
+        var wp = new WINDOWPLACEMENT { length = Marshal.SizeOf<WINDOWPLACEMENT>() };
+        GetWindowPlacement(hwnd, ref wp);
+        return wp;
+    }
 
     // Hotkey modifiers
     public const uint MOD_ALT = 0x0001;
